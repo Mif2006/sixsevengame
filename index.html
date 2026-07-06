@@ -42,6 +42,12 @@ button, .level-card, .cell { touch-action: manipulation; }
   --danger: #ff5470;
 
   --board-shadow: 0 40px 80px -20px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.04) inset;
+
+  --cell: 48px;
+  --gap: 5px;
+  --label-w: 30px;
+  --label-gap: 8px;
+  --board-pad: 14px;
 }
 
 @font-face {
@@ -62,6 +68,7 @@ body {
   flex-direction: column;
   align-items: center;
   padding: 28px 16px 64px;
+  padding-bottom: max(64px, env(safe-area-inset-bottom));
   overflow-x: hidden;
   position: relative;
 }
@@ -82,7 +89,7 @@ body::after  { background: var(--seven-text); bottom: -10%; right: -15%; animati
 @keyframes driftA { 0%,100%{transform:translate(0,0)} 50%{transform:translate(60px,40px)} }
 @keyframes driftB { 0%,100%{transform:translate(0,0)} 50%{transform:translate(-50px,-30px)} }
 
-header { text-align: center; margin-bottom: 22px; position: relative; z-index: 1; }
+header { text-align: center; margin-bottom: 22px; position: relative; z-index: 1; transition: opacity 0.2s, max-height 0.2s, margin 0.2s; overflow: hidden; }
 header h1 {
   font-size: 30px; font-weight: 800; letter-spacing: -0.8px; margin-bottom: 6px;
   background: linear-gradient(180deg, #ffffff 10%, #b9c3ec 100%);
@@ -91,6 +98,16 @@ header h1 {
   filter: drop-shadow(0 1px 0 rgba(0,0,0,0.4));
 }
 header p { font-size: 13px; color: var(--muted); max-width: 500px; line-height: 1.5; margin: 0 auto; }
+
+/* Hide the app title while a level is being played, to reclaim vertical
+   space for the board (the level header inside the game panel already
+   shows which level is active). */
+body.in-game header {
+  max-height: 0;
+  opacity: 0;
+  margin: 0;
+  pointer-events: none;
+}
 
 /* ── Level select ── */
 #level-grid {
@@ -126,6 +143,11 @@ header p { font-size: 13px; color: var(--muted); max-width: 500px; line-height: 
   border-color: #3dba7e;
   box-shadow: 0 10px 24px -10px rgba(61,186,126,0.3), 0 1px 0 rgba(255,255,255,0.05) inset, 0 0 0 1px rgba(61,186,126,0.25);
 }
+.level-card.infinite-card {
+  border-color: var(--lock-purple);
+  background: linear-gradient(160deg, #221a33 0%, #10142200 100%), var(--surface-solid);
+  box-shadow: 0 10px 24px -10px rgba(200,126,255,0.35), 0 1px 0 rgba(255,255,255,0.05) inset, 0 0 0 1px rgba(200,126,255,0.2);
+}
 .level-card-icon { font-size: 30px; line-height: 1; filter: drop-shadow(0 3px 8px rgba(0,0,0,0.4)); }
 .level-card-label { font-size: 14px; font-weight: 800; }
 .level-card-sub { font-size: 11px; color: var(--muted); text-align: center; line-height: 1.4; min-height: 28px; }
@@ -143,6 +165,14 @@ header p { font-size: 13px; color: var(--muted); max-width: 500px; line-height: 
 #level-header {
   display: flex; align-items: center; justify-content: space-between;
   margin-bottom: 14px;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  padding: 10px 4px;
+  background: rgba(6,8,16,0.55);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-radius: 14px;
 }
 #level-header-title {
   display: flex; align-items: center; gap: 8px;
@@ -194,11 +224,15 @@ button.ctrl-btn {
 button.ctrl-btn:hover { background: linear-gradient(180deg, #232b47, #1a2138); border-color: var(--accent); }
 button.ctrl-btn:active { transform: scale(0.95); box-shadow: 0 1px 4px -2px rgba(0,0,0,0.6) inset; }
 
-/* ── Shared grid styles ── */
+/* ── Shared grid styles ──
+   --cell / --gap / --label-w are computed live by JS (fitBoard) so the
+   entire 8x14 board always fits on screen, on every device, and the row
+   labels stay perfectly aligned with their row (same --gap value drives
+   both the board grid and the label column). */
 .board-wrap {
   position: relative;
   border-radius: 22px;
-  padding: 14px;
+  padding: var(--board-pad);
   background:
     linear-gradient(160deg, #181f36 0%, #0d1120 55%, #0a0d18 100%);
   box-shadow: var(--board-shadow);
@@ -206,25 +240,22 @@ button.ctrl-btn:active { transform: scale(0.95); box-shadow: 0 1px 4px -2px rgba
 }
 .board-grid {
   display: grid;
-  grid-template-columns: repeat(8, 48px);
-  grid-template-rows: repeat(14, 48px);
-  gap: 5px;
+  grid-template-columns: repeat(8, var(--cell));
+  grid-template-rows: repeat(14, var(--cell));
+  gap: var(--gap);
   position: relative;
 }
 
 .cell {
-  width: 48px; height: 48px; border-radius: 11px;
+  width: var(--cell); height: var(--cell); border-radius: calc(var(--cell) * 0.225);
   display: flex; align-items: center; justify-content: center;
-  font-size: 18px; font-weight: 800;
+  font-size: calc(var(--cell) * 0.37); font-weight: 800;
   border: 1.5px solid transparent;
   transition: transform 0.12s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.15s, border-color 0.12s, opacity 0.15s, filter 0.15s;
   position: relative; user-select: none;
   z-index: 1;
   transform-style: preserve-3d;
 }
-
-/* Empty socket look for the tray under each cell */
-.cell::before.socket { }
 
 /* Animation class for swapping */
 .cell.animating {
@@ -265,7 +296,7 @@ button.ctrl-btn:active { transform: scale(0.95); box-shadow: 0 1px 4px -2px rgba
   box-shadow: inset 0 3px 6px rgba(0,0,0,0.6), inset 0 -1px 0 rgba(255,255,255,0.03);
   cursor: not-allowed;
   color: #232a44;
-  font-size: 16px;
+  font-size: calc(var(--cell) * 0.32);
   letter-spacing: 0;
 }
 
@@ -432,17 +463,18 @@ button.ctrl-btn:active { transform: scale(0.95); box-shadow: 0 1px 4px -2px rgba
 #board-section { display: flex; gap: 0; position: relative; }
 #row-labels {
   display: flex; flex-direction: column;
-  gap: 5px; padding-top: 14px;
+  gap: var(--gap); padding-top: var(--board-pad);
   justify-content: flex-start;
-  margin-right: 8px;
+  margin-right: var(--label-gap);
 }
 .row-label {
-  width: 30px; height: 48px;
+  width: var(--label-w); height: var(--cell);
   display: flex; align-items: center; justify-content: flex-end;
-  font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums;
+  font-size: calc(var(--cell) * 0.225); color: var(--muted); font-variant-numeric: tabular-nums;
   font-weight: 600;
   padding-right: 4px;
   transition: color 0.3s, text-shadow 0.3s;
+  white-space: nowrap;
 }
 .row-label.correct-row { color: var(--lock-purple); font-weight: 700; text-shadow: 0 0 8px rgba(200,126,255,0.6); }
 
@@ -450,7 +482,7 @@ button.ctrl-btn:active { transform: scale(0.95); box-shadow: 0 1px 4px -2px rgba
 .row-fire-track {
   position: absolute;
   left: 0; right: 0;
-  height: 48px;
+  height: var(--cell);
   pointer-events: none;
   z-index: 50;
   overflow: visible;
@@ -638,6 +670,8 @@ button.ctrl-btn:active { transform: scale(0.95); box-shadow: 0 1px 4px -2px rgba
 #board { touch-action: none; }
 
 @media (max-width: 700px) {
+  body { padding: 14px 12px 24px; padding-bottom: max(24px, env(safe-area-inset-bottom)); }
+
   /* Level select: 2 columns on narrow screens */
   #level-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
   .level-card { padding: 16px 10px 14px; gap: 4px; }
@@ -648,55 +682,36 @@ button.ctrl-btn:active { transform: scale(0.95); box-shadow: 0 1px 4px -2px rgba
   .level-card-best { font-size: 10px; padding: 2px 8px; }
 
   /* Header */
-  header { margin-bottom: 14px; }
-  header h1 { font-size: 22px; }
-  header p { font-size: 12px; }
+  header { margin-bottom: 12px; }
+  header h1 { font-size: 21px; }
+  header p { font-size: 11.5px; }
 
   /* Panels */
   #panel-game, #panel-levels { max-width: 100%; }
 
   /* Level header */
-  #level-header { margin-bottom: 10px; }
+  #level-header { margin-bottom: 8px; padding: 8px 10px; border-radius: 12px; }
   #level-header-title { font-size: 13px; }
   #level-header-spacer { width: 64px; }
 
   /* Controls: shrink chips, tighten gap */
-  #controls { gap: 6px; margin-bottom: 10px; }
+  #controls { gap: 6px; margin-bottom: 8px; }
   .stat-chip { font-size: 11px; padding: 5px 9px; gap: 4px; border-radius: 8px; }
   button.ctrl-btn { font-size: 11px; padding: 5px 11px; border-radius: 8px; }
 
   /* Status bar */
-  #status { font-size: 11px; margin-bottom: 10px; }
+  #status { font-size: 11px; margin-bottom: 8px; }
 
   /* Board layout: stack board and side panel vertically */
-  #game-layout { flex-direction: column; align-items: center; gap: 14px; }
+  #game-layout { flex-direction: column; align-items: center; gap: 10px; }
   #side-panel { flex: none; width: 100%; flex-direction: row; flex-wrap: wrap; gap: 10px; }
   .info-card { flex: 1; min-width: 140px; padding: 12px; }
   .info-card h3 { margin-bottom: 8px; }
   .legend-item { font-size: 11px; gap: 7px; margin-bottom: 7px; }
 
-  /* Board: fill available width minus row-labels (≈28px) and board-wrap padding (20px) */
-  #board-section { width: 100%; }
-  .board-wrap { padding: 8px; border-radius: 14px; width: 100%; }
-  #row-labels { margin-right: 5px; }
-  .row-label { width: 22px; font-size: 9px; padding-right: 2px; }
-
-  /* Cell size: fit 8 cells + row-labels + gap in full width.
-     Row-labels ~28px, board-wrap padding 16px, gaps 7×2px = 14px
-     Available ≈ (100vw - 44px) / 8  */
-  .board-grid {
-    grid-template-columns: repeat(8, calc((100vw - 58px) / 8));
-    grid-template-rows: repeat(14, calc((100vw - 58px) / 8));
-    gap: 2px;
-  }
-  .cell {
-    width:  calc((100vw - 58px) / 8);
-    height: calc((100vw - 58px) / 8);
-    font-size: calc((100vw - 58px) / 8 * 0.38);
-    border-radius: calc((100vw - 58px) / 8 * 0.2);
-    border-width: 1px;
-  }
-  .row-label { height: calc((100vw - 58px) / 8); }
+  /* Board wrap: cell size itself is computed by JS (fitBoard) */
+  #board-section { width: 100%; justify-content: center; }
+  .board-wrap { border-radius: 14px; }
 
   /* Tutorial card on mobile: full width, pinned at bottom of screen */
   #tut-card {
@@ -724,7 +739,6 @@ button.ctrl-btn:active { transform: scale(0.95); box-shadow: 0 1px 4px -2px rgba
   /* Very small phones: 2 col level grid stays but smaller */
   #level-grid { gap: 8px; }
   .level-card { padding: 13px 8px 11px; }
-  body { padding: 16px 10px 48px; }
 }
 
 /* Scroll lock applied via JS during tutorial */
@@ -971,6 +985,8 @@ const ROWS = 14, COLS = 8;
 // Tutorial has zero walls so the player learns the knight-move + lock rules
 // with nothing else to think about. Levels 1-5 ramp up wall density (and
 // therefore difficulty/tightness of the puzzle) for a real progression curve.
+// The Infinite level is fully randomized (wall count + lock threshold) and
+// re-rolled every single time it's played, so it's handled specially below.
 const LEVELS = [
   { id: 0, label: 'Tutorial', subtitle: 'Learn the moves',      walls: 0,  threshold: 1, icon: '🎓' },
   { id: 1, label: 'Level 1',  subtitle: 'Warming up',           walls: 10, threshold: 1, icon: '①' },
@@ -978,6 +994,7 @@ const LEVELS = [
   { id: 3, label: 'Level 3',  subtitle: 'Mind the gaps',        walls: 21, threshold: 1, icon: '③' },
   { id: 4, label: 'Level 4',  subtitle: 'Double-lock unlocked',  walls: 26, threshold: 2, icon: '④' },
   { id: 5, label: 'Level 5',  subtitle: 'The gauntlet',         walls: 30, threshold: 2, icon: '⑤' },
+  { id: 6, label: 'Infinite', subtitle: 'Endless random puzzles', walls: null, threshold: null, icon: '♾️', infinite: true },
 ];
 
 let currentLevelIndex = 0;
@@ -1092,8 +1109,19 @@ function makeShuffledStart(wallSet) {
 
 function initGame(regenerate) {
   const level = LEVELS[currentLevelIndex];
-  lockThreshold = level.threshold;
-  if (regenerate || !savedStart) generateAndSave(level.walls);
+  let wallCount = level.walls;
+  let threshold = level.threshold;
+
+  // Infinite mode: roll brand-new random parameters every single time
+  // (fresh wall count + fresh lock threshold), and always regenerate.
+  if (level.infinite) {
+    wallCount = 8 + Math.floor(Math.random() * 26); // 8–33 walls
+    threshold = Math.random() < 0.5 ? 1 : 2;
+    regenerate = true;
+  }
+
+  lockThreshold = threshold;
+  if (regenerate || !savedStart) generateAndSave(wallCount);
   walls = new Set(savedWalls);
   grid = deepCopy(savedStart);
   locked = Array.from({length:ROWS}, () => Array(COLS).fill(false));
@@ -1112,6 +1140,7 @@ function initGame(regenerate) {
   document.getElementById('legend-warming').style.display = lockThreshold === 2 ? '' : 'none';
   updateLevelHeader();
   renderGame();
+  fitBoard();
   if (currentLevelIndex === 0 && regenerate) {
     setTimeout(startTutorial, 600);
   }
@@ -1628,6 +1657,7 @@ function handleGameClick(r, c) {
 
 function showWin() {
   stopTimer();
+  const level = LEVELS[currentLevelIndex];
   const prog = levelProgress[currentLevelIndex];
   const isFirstClear = !prog.completed;
   prog.completed = true;
@@ -1636,14 +1666,17 @@ function showWin() {
   document.getElementById('win-mc').textContent = moves;
   document.getElementById('win-time').textContent = formatTime(timeElapsed);
 
-  const hasNext = currentLevelIndex < LEVELS.length - 1;
+  const hasNext = level.infinite || currentLevelIndex < LEVELS.length - 1;
   const nextBtn = document.getElementById('win-reset-btn');
   const title = document.getElementById('win-title');
   const sub = document.getElementById('win-sub');
-  const levelLabel = LEVELS[currentLevelIndex].label;
+  const levelLabel = level.label;
 
   title.textContent = isFirstClear ? `${levelLabel} Clear!` : `${levelLabel} Clear Again!`;
-  if (hasNext) {
+  if (level.infinite) {
+    sub.innerHTML = `All rows locked in.<br>Want another random puzzle?`;
+    nextBtn.textContent = 'New Puzzle →';
+  } else if (hasNext) {
     sub.innerHTML = `All rows locked in.<br>Ready for ${LEVELS[currentLevelIndex+1].label}?`;
     nextBtn.textContent = 'Next Level →';
   } else {
@@ -1664,7 +1697,8 @@ document.getElementById('win-close-btn').addEventListener('click', () => {
 });
 document.getElementById('win-reset-btn').addEventListener('click', () => {
   document.getElementById('win-overlay').classList.remove('show'); stopConfetti();
-  if (currentLevelIndex < LEVELS.length - 1) currentLevelIndex++;
+  const level = LEVELS[currentLevelIndex];
+  if (!level.infinite && currentLevelIndex < LEVELS.length - 1) currentLevelIndex++;
   initGame(true);
 });
 document.getElementById('reset-btn').addEventListener('click', () => initGame(false));
@@ -1724,6 +1758,53 @@ document.getElementById('go-retry-btn').addEventListener('click', () => {
   document.getElementById('gameover-overlay').classList.remove('show');
   initGame(false);
 });
+
+
+// ═══════════════════════════════════════════
+//  BOARD FIT — computes --cell / --gap / --label-w live so the whole
+//  8x14 board is always fully visible on screen (both width AND height),
+//  on any device. Row labels share the same --gap / --cell vars as the
+//  board grid, so they always line up with their row exactly.
+// ═══════════════════════════════════════════
+function fitBoard() {
+  const panelGame = document.getElementById('panel-game');
+  if (!panelGame.classList.contains('active')) return;
+
+  const isNarrow = window.innerWidth <= 700;
+  const gap = isNarrow ? 3 : 5;
+  const boardPad = isNarrow ? 8 : 14;
+  const labelW = isNarrow ? 20 : 30;
+  const labelGap = isNarrow ? 4 : 8;
+
+  document.documentElement.style.setProperty('--gap', gap + 'px');
+  document.documentElement.style.setProperty('--board-pad', boardPad + 'px');
+  document.documentElement.style.setProperty('--label-w', labelW + 'px');
+  document.documentElement.style.setProperty('--label-gap', labelGap + 'px');
+
+  const boardSection = document.getElementById('board-section');
+  const sectionRect = boardSection.getBoundingClientRect();
+
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+
+  // How much vertical room is left below the top of the board section,
+  // minus a little breathing room at the bottom.
+  const bottomMargin = isNarrow ? 12 : 24;
+  const availHeight = vh - sectionRect.top - bottomMargin;
+
+  // How much horizontal room the board itself has (side panel, on wide
+  // layouts, sits next to it and is NOT part of this width).
+  const availWidth = sectionRect.width || (vw - 32);
+
+  const maxCellFromWidth  = (availWidth - labelW - labelGap - boardPad*2 - gap*7) / 8;
+  const maxCellFromHeight = (availHeight - boardPad*2 - gap*13) / 14;
+
+  let cell = Math.floor(Math.min(maxCellFromWidth, maxCellFromHeight));
+  cell = Math.max(16, Math.min(cell, 48));
+
+  document.documentElement.style.setProperty('--cell', cell + 'px');
+}
+window.addEventListener('resize', fitBoard);
 
 
 // ═══════════════════════════════════════════
@@ -1951,8 +2032,6 @@ function tutShowStep(step) {
           <rect class="kg" x="29" y="83" width="25" height="25" rx="4"/>
           <rect class="kg" x="56" y="83" width="25" height="25" rx="4"/>
           <rect class="kg" x="83" y="83" width="25" height="25" rx="4"/>
-          <!-- reachable = 2+1 jumps from (1,1): (3,0),(3,2),(0,3),(2,3) = off grid mostly for 4x4 -->
-          <!-- easier: show (0,0) via 1up+2left impossible on 4x4; show arrows instead -->
           <rect class="kr" x="2"  y="2"  width="25" height="25" rx="4"/>
           <rect class="kr" x="56" y="2"  width="25" height="25" rx="4"/>
           <rect class="kr" x="2"  y="56" width="25" height="25" rx="4"/>
@@ -2114,21 +2193,21 @@ function renderLevelSelect() {
   LEVELS.forEach((level, i) => {
     const prog = levelProgress[i];
     const prevCompleted = i === 0 || levelProgress[i-1].completed;
-    const locked = !prevCompleted;
+    const locked = level.infinite ? false : !prevCompleted;
 
     const card = document.createElement('button');
-    card.className = 'level-card' + (locked ? ' locked' : '') + (prog.completed ? ' completed' : '');
+    card.className = 'level-card' + (locked ? ' locked' : '') + (prog.completed ? ' completed' : '') + (level.infinite ? ' infinite-card' : '');
     card.disabled = locked;
 
-    const wallNote = level.walls === 0 ? 'No walls' : `${level.walls} walls`;
-    const lockNote = level.threshold === 2 ? 'Double-lock' : 'Single-lock';
+    const wallNote = level.infinite ? 'Random each time' : (level.walls === 0 ? 'No walls' : `${level.walls} walls`);
+    const lockNote = level.infinite ? 'Single or double' : (level.threshold === 2 ? 'Double-lock' : 'Single-lock');
 
     card.innerHTML = `
       <div class="level-card-icon">${locked ? '🔒' : level.icon}</div>
       <div class="level-card-label">${level.label}</div>
       <div class="level-card-sub">${locked ? 'Complete previous level' : level.subtitle}</div>
       ${!locked ? `<div class="level-card-meta">${wallNote} · ${lockNote}</div>` : ''}
-      ${prog.completed ? `<div class="level-card-best">✓ Best: ${prog.bestMoves} moves</div>` : ''}
+      ${(prog.completed && !level.infinite) ? `<div class="level-card-best">✓ Best: ${prog.bestMoves} moves</div>` : ''}
     `;
 
     if (!locked) {
@@ -2143,12 +2222,14 @@ function renderLevelSelect() {
 
 function showLevelSelect() {
   stopTimer();
+  document.body.classList.remove('in-game');
   document.getElementById('panel-levels').classList.add('active');
   document.getElementById('panel-game').classList.remove('active');
   renderLevelSelect();
 }
 
 function showGame(regenerate) {
+  document.body.classList.add('in-game');
   document.getElementById('panel-levels').classList.remove('active');
   document.getElementById('panel-game').classList.add('active');
   initGame(regenerate);
@@ -2163,9 +2244,5 @@ function updateLevelHeader() {
 renderLevelSelect();
 </script>
 
-<script type="module" src="/src/main.js"></script>
 </body>
 </html>
-
-
-
