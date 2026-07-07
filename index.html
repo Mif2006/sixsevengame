@@ -73,6 +73,17 @@ body {
   position: relative;
 }
 
+/* Reproduces body's own flex layout one level deeper, so wrapping the
+   content for shake purposes doesn't change how header/panels are sized
+   or centered. Needs an explicit width (not shrink-to-fit) since it's
+   itself body's flex item under align-items:center. */
+#shake-target {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
 /* Ambient floating background glows */
 body::before, body::after {
   content: '';
@@ -275,11 +286,6 @@ button.ctrl-btn:active { transform: scale(0.95); box-shadow: 0 1px 4px -2px rgba
   z-index: 100 !important;
   pointer-events: none;
   animation: none !important;
-  /* Promote just these two cells to their own compositor layer for the
-     duration of the swap, so the browser can slide them without repainting
-     the rest of the board underneath. Removed automatically since the
-     class itself is removed right after the swap finishes. */
-  will-change: transform;
 }
 
 /* 3D glossy piece styling */
@@ -425,12 +431,15 @@ button.ctrl-btn:active { transform: scale(0.95); box-shadow: 0 1px 4px -2px rgba
     0 0 16px 2px rgba(200,126,255,0.4) !important;
 }
 
-/* Ignition pulse played on each cell as the fire sweep passes through it */
+/* Ignition pulse played on each cell as the fire sweep passes through it.
+   Transform-only (no filter animation) — filter forces a real repaint on
+   every keyframe step, and up to 8 of these can run at once during a row
+   completion, which was a meaningful chunk of the lag on that moment. */
 @keyframes ignitePulse {
-  0%   { filter: brightness(1) saturate(1); transform: translateY(0) scale(1); }
-  35%  { filter: brightness(1.7) saturate(1.6); transform: translateY(-9px) scale(1.22); }
-  60%  { filter: brightness(1.3) saturate(1.3); transform: translateY(-3px) scale(1.08); }
-  100% { filter: brightness(1) saturate(1); transform: translateY(0) scale(1); }
+  0%   { transform: translateY(0) scale(1); }
+  35%  { transform: translateY(-9px) scale(1.28); }
+  60%  { transform: translateY(-3px) scale(1.1); }
+  100% { transform: translateY(0) scale(1); }
 }
 .cell.ignite {
   animation: ignitePulse 0.55s cubic-bezier(0.22,1,0.36,1);
@@ -883,6 +892,17 @@ body.tut-lock { overflow: hidden !important; position: fixed; width: 100%; }
 </head>
 <body>
 
+<!-- Everything that isn't position:fixed lives inside this wrapper. The
+     screen-shake effect animates THIS element's transform, not <body> —
+     if body itself gets a transform, every position:fixed element on the
+     page (canvases, shockwave rings, flash, banner, tutorial overlay)
+     stops being cheaply pinned to the viewport and has to be recomputed
+     like an absolutely-positioned element instead, every frame, for as
+     long as the transform is active. That was happening on every single
+     row completion (which is exactly when a burst of fixed fx elements
+     spawns), and was very likely the real source of the lag. -->
+<div id="shake-target">
+
 <header>
   <h1>⚔ Knight Swap</h1>
   <p>Arrange rows so each is all 6s or all 7s, alternating. Swap pieces using chess knight moves.</p>
@@ -965,6 +985,7 @@ body.tut-lock { overflow: hidden !important; position: fixed; width: 100%; }
   </div>
 </div>
 
+</div><!-- /#shake-target -->
 
 <!-- Tutorial overlay -->
 <div id="tut-overlay">
@@ -1531,10 +1552,11 @@ function triggerRowFire(rowIndex) {
 
   // Light screen shake, timed to the peak of the sweep
   setTimeout(() => {
-    document.body.classList.remove('shake');
+    const shakeTarget = document.getElementById('shake-target');
+    shakeTarget.classList.remove('shake');
     requestAnimationFrame(() => {
-      document.body.classList.add('shake');
-      setTimeout(() => document.body.classList.remove('shake'), 420);
+      shakeTarget.classList.add('shake');
+      setTimeout(() => shakeTarget.classList.remove('shake'), 420);
     });
   }, STEP * Math.floor(cells.length / 2));
 
