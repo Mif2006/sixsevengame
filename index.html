@@ -3,2400 +3,773 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-capable" content="yes">
 <title>Knight Swap Puzzle</title>
+<script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-button, .level-card, .cell { touch-action: manipulation; }
-
-:root {
-  --bg: #060810;
-  --bg-radial: #0d1326;
-  --surface: #12162472;
-  --surface-solid: #141a2c;
-  --surface2: #1b2238;
-  --surface2-hi: #232b47;
-  --border: #2a3050;
-  --border-hi: #3a4470;
-  --text: #eef0fb;
-  --muted: #828aae;
-
-  --six-text: #4fe3ff;
-  --six-mid:  #1aa8d9;
-  --six-deep: #0c5e85;
-  --six-glow: #4fe3ff;
-
-  --seven-text: #ff62c4;
-  --seven-mid:  #d62e96;
-  --seven-deep: #831a63;
-  --seven-glow: #ff62c4;
-
-  --selected-glow: #7db8ff;
-  --accent: #6fa8ff;
-  --gold: #ffc857;
-  --lock-purple: #c87eff;
-  --fire-1: #ffd166;
-  --fire-2: #ff7a3d;
-  --fire-3: #ff3d3d;
-  --danger: #ff5470;
-
-  --board-shadow: 0 40px 80px -20px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.04) inset;
-
-  --cell: 48px;
-  --gap: 5px;
-  --label-w: 30px;
-  --label-gap: 8px;
-  --board-pad: 14px;
-}
-
-@font-face {
-  font-family: 'system-rounded';
-  src: local('SF Pro Rounded');
-}
-
 body {
-  background:
-    radial-gradient(ellipse 900px 600px at 50% -10%, var(--bg-radial) 0%, transparent 60%),
-    radial-gradient(ellipse 700px 500px at 90% 100%, #1a0d2e 0%, transparent 55%),
-    var(--bg);
-  background-attachment: fixed;
-  color: var(--text);
-  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 28px 16px 64px;
-  padding-bottom: max(64px, env(safe-area-inset-bottom));
-  overflow-x: hidden;
-  position: relative;
+  background: radial-gradient(ellipse 900px 600px at 50% -10%, #0d1326 0%, transparent 60%), #060810;
+  color: #eef0fb; font-family: 'Segoe UI', system-ui, sans-serif;
+  min-height: 100vh; display: flex; flex-direction: column; align-items: center;
+  padding: 28px 16px 64px; overflow-x: hidden;
 }
+header { text-align: center; margin-bottom: 22px; z-index: 10; }
+header h1 { font-size: 30px; font-weight: 800; letter-spacing: -0.8px; background: linear-gradient(180deg, #ffffff 10%, #b9c3ec 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+header p { font-size: 13px; color: #828aae; max-width: 500px; line-height: 1.5; }
 
-/* Reproduces body's own flex layout one level deeper, so wrapping the
-   content for shake purposes doesn't change how header/panels are sized
-   or centered. Needs an explicit width (not shrink-to-fit) since it's
-   itself body's flex item under align-items:center. */
-#shake-target {
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
+.panel { display: none; width: 100%; max-width: 640px; }
+.panel.active { display: flex; flex-direction: column; align-items: center; }
 
-/* Ambient floating background glows */
-body::before, body::after {
-  content: '';
-  position: fixed;
-  width: 500px; height: 500px;
-  border-radius: 50%;
-  filter: blur(120px);
-  opacity: 0.12;
-  pointer-events: none;
-  z-index: 0;
-}
-body::before { background: var(--six-text); top: -10%; left: -15%; animation: driftA 22s ease-in-out infinite; }
-body::after  { background: var(--seven-text); bottom: -10%; right: -15%; animation: driftB 26s ease-in-out infinite; }
-@keyframes driftA { 0%,100%{transform:translate(0,0)} 50%{transform:translate(60px,40px)} }
-@keyframes driftB { 0%,100%{transform:translate(0,0)} 50%{transform:translate(-50px,-30px)} }
-/* These blobs run forever purely for ambience. On touch devices (phones/
-   tablets) that continuous compositing work isn't worth the battery/CPU
-   cost, so freeze them in place instead of animating. */
-@media (pointer: coarse), (prefers-reduced-motion: reduce) {
-  body::before, body::after { animation: none; }
-}
-
-header { text-align: center; margin-bottom: 22px; position: relative; z-index: 1; transition: opacity 0.2s, max-height 0.2s, margin 0.2s; overflow: hidden; }
-header h1 {
-  font-size: 30px; font-weight: 800; letter-spacing: -0.8px; margin-bottom: 6px;
-  background: linear-gradient(180deg, #ffffff 10%, #b9c3ec 100%);
-  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
-  text-shadow: 0 2px 24px rgba(111,168,255,0.25);
-  filter: drop-shadow(0 1px 0 rgba(0,0,0,0.4));
-}
-header p { font-size: 13px; color: var(--muted); max-width: 500px; line-height: 1.5; margin: 0 auto; }
-
-/* Hide the app title while a level is being played, to reclaim vertical
-   space for the board (the level header inside the game panel already
-   shows which level is active). */
-body.in-game header {
-  max-height: 0;
-  opacity: 0;
-  margin: 0;
-  pointer-events: none;
-}
-
-/* ── Level select ── */
-#level-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 14px;
-}
+#level-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; width: 100%; }
 .level-card {
-  position: relative;
-  display: flex; flex-direction: column; align-items: center; gap: 6px;
-  padding: 22px 12px 18px;
-  border-radius: 16px;
-  border: 1px solid var(--border);
-  background: linear-gradient(160deg, #171d33 0%, #10142200 100%), var(--surface-solid);
-  color: var(--text);
-  cursor: pointer;
-  font-family: inherit;
+  position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: 22px 12px 18px; border-radius: 16px; border: 1px solid #2a3050;
+  background: linear-gradient(160deg, #171d33 0%, #10142200 100%), #141a2c;
+  color: #eef0fb; cursor: pointer; font-family: inherit;
   box-shadow: 0 10px 24px -10px rgba(0,0,0,0.55), 0 1px 0 rgba(255,255,255,0.05) inset;
   transition: transform 0.15s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.2s, border-color 0.2s;
 }
-.level-card:hover:not(:disabled) {
-  transform: translateY(-4px);
-  border-color: var(--accent);
-  box-shadow: 0 16px 32px -12px rgba(111,168,255,0.3), 0 1px 0 rgba(255,255,255,0.08) inset;
-}
-.level-card:active:not(:disabled) { transform: translateY(-1px) scale(0.98); }
-.level-card:disabled, .level-card.locked {
-  cursor: not-allowed;
-  opacity: 0.45;
-  filter: saturate(0.4);
-}
-.level-card.completed {
-  border-color: #3dba7e;
-  box-shadow: 0 10px 24px -10px rgba(61,186,126,0.3), 0 1px 0 rgba(255,255,255,0.05) inset, 0 0 0 1px rgba(61,186,126,0.25);
-}
-.level-card.infinite-card {
-  border-color: var(--lock-purple);
-  background: linear-gradient(160deg, #221a33 0%, #10142200 100%), var(--surface-solid);
-  box-shadow: 0 10px 24px -10px rgba(200,126,255,0.35), 0 1px 0 rgba(255,255,255,0.05) inset, 0 0 0 1px rgba(200,126,255,0.2);
-}
-.level-card-icon { font-size: 30px; line-height: 1; filter: drop-shadow(0 3px 8px rgba(0,0,0,0.4)); }
+.level-card:hover:not(:disabled) { transform: translateY(-4px); border-color: #6fa8ff; box-shadow: 0 16px 32px -12px rgba(111,168,255,0.3); }
+.level-card:disabled { cursor: not-allowed; opacity: 0.45; filter: saturate(0.4); }
+.level-card.completed { border-color: #3dba7e; box-shadow: 0 10px 24px -10px rgba(61,186,126,0.3); }
+.level-card-icon { font-size: 30px; line-height: 1; }
 .level-card-label { font-size: 14px; font-weight: 800; }
-.level-card-sub { font-size: 11px; color: var(--muted); text-align: center; line-height: 1.4; min-height: 28px; }
-.level-card-meta { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; opacity: 0.8; }
-.level-card-best {
-  font-size: 11px; font-weight: 700; color: #6de0a8;
-  background: rgba(61,186,126,0.12); border-radius: 20px; padding: 3px 10px; margin-top: 2px;
-}
+.level-card-sub { font-size: 11px; color: #828aae; text-align: center; min-height: 28px; }
 
-@media (max-width: 640px) {
-  #level-grid { grid-template-columns: repeat(2, 1fr); }
-}
-
-/* ── Level header (inside game panel) ── */
-#level-header {
-  display: flex; align-items: center; justify-content: space-between;
-  margin-bottom: 14px;
-  position: sticky;
-  top: 0;
-  z-index: 20;
-  padding: 10px 4px;
-  /* Solid color instead of backdrop-filter: blur() — backdrop-filter on a
-     sticky element is one of the heaviest things you can do on Android
-     WebView (it resamples everything behind it every scroll/paint frame). */
-  background: rgba(9,11,20,0.92);
-  border-radius: 14px;
-}
-#level-header-title {
-  display: flex; align-items: center; gap: 8px;
-  font-size: 15px; font-weight: 700;
-  background: linear-gradient(180deg, #fff, #c4cdf2);
-  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
-}
-#level-header-icon { font-size: 18px; -webkit-text-fill-color: initial; filter: drop-shadow(0 2px 6px rgba(0,0,0,0.4)); }
-#level-header-spacer { width: 84px; visibility: hidden; }
-
-/* ── Panels ── */
-#panel-game, #panel-levels { width: 100%; max-width: 640px; position: relative; z-index: 1; }
-.panel { display: none; }
-.panel.active { display: block; animation: panelIn 0.3s ease; }
-@keyframes panelIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
-
-/* ── Controls row ── */
-#controls {
-  display: flex; align-items: center; gap: 10px;
-  margin-bottom: 16px; flex-wrap: wrap; justify-content: center;
-}
+#controls { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; justify-content: center; }
 .stat-chip {
-  display: flex; align-items: center; gap: 6px;
-  background: linear-gradient(180deg, #161c30, #11151f);
-  border: 1px solid var(--border);
-  border-radius: 10px; padding: 7px 13px;
-  font-size: 13px; color: var(--muted);
+  display: flex; align-items: center; gap: 6px; background: linear-gradient(180deg, #161c30, #11151f);
+  border: 1px solid #2a3050; border-radius: 10px; padding: 7px 13px; font-size: 13px; color: #828aae;
   box-shadow: 0 1px 0 rgba(255,255,255,0.04) inset, 0 4px 10px -4px rgba(0,0,0,0.5);
 }
-.stat-chip b, .stat-chip span.val { color: var(--text); font-weight: 700; font-variant-numeric: tabular-nums; }
-#locked-count span.val { color: var(--lock-purple); }
-
-#status {
-  font-size: 13px; color: var(--muted);
-  text-align: center; margin-bottom: 16px; min-height: 18px;
-  transition: color 0.2s;
+.stat-chip b, .stat-chip span { color: #eef0fb; font-weight: 700; }
+.ctrl-btn {
+  background: linear-gradient(180deg, #1c2338, #141a2c); border: 1px solid #2a3050;
+  color: #eef0fb; font-size: 13px; font-weight: 500; padding: 7px 15px; border-radius: 10px;
+  cursor: pointer; font-family: inherit; box-shadow: 0 1px 0 rgba(255,255,255,0.05) inset;
+  transition: background 0.15s, border-color 0.15s, transform 0.1s;
 }
-#status.active { color: var(--accent); }
-#status.warn { color: var(--danger); }
+.ctrl-btn:hover { background: linear-gradient(180deg, #232b47, #1a2138); border-color: #6fa8ff; }
+.ctrl-btn:active { transform: scale(0.95); }
 
-button.ctrl-btn {
-  background: linear-gradient(180deg, #1c2338, #141a2c);
-  border: 1px solid var(--border);
-  color: var(--text); font-size: 13px; font-weight: 500; padding: 7px 15px;
-  border-radius: 10px; cursor: pointer; font-family: inherit;
-  box-shadow: 0 1px 0 rgba(255,255,255,0.05) inset, 0 4px 10px -4px rgba(0,0,0,0.5);
-  transition: background 0.15s, border-color 0.15s, transform 0.1s, box-shadow 0.15s;
-}
-button.ctrl-btn:hover { background: linear-gradient(180deg, #232b47, #1a2138); border-color: var(--accent); }
-button.ctrl-btn:active { transform: scale(0.95); box-shadow: 0 1px 4px -2px rgba(0,0,0,0.6) inset; }
-
-/* ── Shared grid styles ──
-   --cell / --gap / --label-w are computed live by JS (fitBoard) so the
-   entire 8x14 board always fits on screen, on every device, and the row
-   labels stay perfectly aligned with their row (same --gap value drives
-   both the board grid and the label column). */
-.board-wrap {
-  position: relative;
-  border-radius: 22px;
-  padding: var(--board-pad);
-  background:
-    linear-gradient(160deg, #181f36 0%, #0d1120 55%, #0a0d18 100%);
-  box-shadow: var(--board-shadow);
+#phaser-container {
+  width: 100%; display: flex; justify-content: center;
+  border-radius: 22px; overflow: hidden; position: relative;
+  background: linear-gradient(160deg, #181f36 0%, #0d1120 55%, #0a0d18 100%);
+  box-shadow: 0 40px 80px -20px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.04) inset;
   border: 1px solid rgba(255,255,255,0.06);
+  padding: 14px;
 }
-.board-grid {
-  display: grid;
-  grid-template-columns: repeat(8, var(--cell));
-  grid-template-rows: repeat(14, var(--cell));
-  gap: var(--gap);
-  position: relative;
-  contain: layout style;
-}
+canvas { touch-action: none; display: block; }
 
-.cell {
-  width: var(--cell); height: var(--cell); border-radius: calc(var(--cell) * 0.225);
-  display: flex; align-items: center; justify-content: center;
-  font-size: calc(var(--cell) * 0.37); font-weight: 800;
-  border: 1.5px solid transparent;
-  transition: transform 0.12s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.15s, border-color 0.12s, opacity 0.15s, filter 0.15s;
-  position: relative; user-select: none;
-  z-index: 1;
-  transform-style: preserve-3d;
-  /* layout+style containment only — NOT paint, which would clip the
-     box-shadow glows (selected/reachable/warming) that intentionally
-     extend past the cell's border box. */
-  contain: layout style;
-}
-
-/* Animation class for swapping */
-.cell.animating {
-  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), z-index 0s;
-  z-index: 100 !important;
-  pointer-events: none;
-  animation: none !important;
-}
-
-/* 3D glossy piece styling */
-.cell.six, .cell.seven {
-  box-shadow:
-    0 3px 0 0 rgba(0,0,0,0.35),
-    0 6px 10px -2px rgba(0,0,0,0.55),
-    inset 0 2px 3px rgba(255,255,255,0.18),
-    inset 0 -4px 6px rgba(0,0,0,0.3);
-  text-shadow: 0 1px 2px rgba(0,0,0,0.5), 0 0 10px currentColor;
-}
-.cell.six {
-  background:
-    radial-gradient(circle at 32% 28%, rgba(255,255,255,0.55) 0%, transparent 35%),
-    linear-gradient(150deg, var(--six-text) 0%, var(--six-mid) 48%, var(--six-deep) 100%);
-  color: #eafcff;
-  border-color: rgba(79,227,255,0.55);
-}
-.cell.seven {
-  background:
-    radial-gradient(circle at 32% 28%, rgba(255,255,255,0.5) 0%, transparent 35%),
-    linear-gradient(150deg, var(--seven-text) 0%, var(--seven-mid) 48%, var(--seven-deep) 100%);
-  color: #fff0f9;
-  border-color: rgba(255,98,196,0.55);
-}
-
-/* Wall cell — recessed empty socket */
-.cell.wall {
-  background: radial-gradient(circle at 50% 35%, #1a1e30 0%, #0c0e18 75%);
-  border-color: rgba(255,255,255,0.03);
-  box-shadow: inset 0 3px 6px rgba(0,0,0,0.6), inset 0 -1px 0 rgba(255,255,255,0.03);
-  cursor: not-allowed;
-  color: #232a44;
-  font-size: calc(var(--cell) * 0.32);
-  letter-spacing: 0;
-}
-
-/* Locked cell */
-.cell.locked {
-  cursor: not-allowed;
-  filter: saturate(0.55) brightness(0.85);
-  box-shadow:
-    0 1px 0 0 rgba(0,0,0,0.35),
-    inset 0 2px 3px rgba(255,255,255,0.1),
-    inset 0 -3px 5px rgba(0,0,0,0.35);
-}
-.cell.locked::before {
-  content: '🔒';
-  position: absolute;
-  font-size: 10px;
-  top: 2px; right: 3px;
-  opacity: 0.85;
-  filter: drop-shadow(0 1px 1px rgba(0,0,0,0.6));
-}
-
-/* Playable cell */
-.cell.playable { cursor: pointer; }
-.cell.playable:hover {
-  transform: translateY(-3px) scale(1.05);
-  filter: brightness(1.12);
-}
-.cell.selected {
-  border-color: var(--selected-glow) !important;
-  box-shadow:
-    0 0 0 2.5px var(--selected-glow),
-    0 0 22px 4px rgba(125,184,255,0.55),
-    0 10px 16px -4px rgba(0,0,0,0.6),
-    inset 0 2px 3px rgba(255,255,255,0.25) !important;
-  transform: translateY(-5px) scale(1.18) !important;
-  z-index: 10;
-  animation: selectedBob 1.4s ease-in-out infinite;
-}
-@keyframes selectedBob {
-  0%, 100% { transform: translateY(-5px) scale(1.18); }
-  50%      { transform: translateY(-8px) scale(1.18); }
-}
-.cell.reachable { cursor: pointer; }
-.cell.reachable::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: 11px;
-  background: radial-gradient(circle, rgba(255,255,255,0.16) 0%, transparent 70%);
-  box-shadow: 0 0 10px 2px rgba(255,255,255,0.22), inset 0 0 0 1.5px rgba(255,255,255,0.5);
-  animation: reachPulse 1.3s ease-in-out infinite;
-  pointer-events: none;
-  will-change: opacity, transform;
-}
-/* Opacity/transform only — box-shadow itself is set once above so the
-   browser can animate this on the compositor instead of repainting the
-   shadow every frame (this used to be the single biggest per-frame cost
-   while a piece was selected). */
-@keyframes reachPulse {
-  0%, 100% { opacity: 0.5; transform: scale(1); }
-  50%      { opacity: 1;   transform: scale(1.03); }
-}
-
-/* Warming cell */
-.cell.warming {
-  border-color: var(--fire-1) !important;
-  position: relative;
-}
-.cell.warming::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  box-shadow: 0 0 14px 3px rgba(255,122,61,0.55), inset 0 0 0 2px var(--fire-2);
-  opacity: 0;
-  animation: warmPulse 1.3s ease-in-out infinite;
-  pointer-events: none;
-  will-change: opacity;
-}
-@keyframes warmPulse {
-  0%,100% { opacity: 0; }
-  50%      { opacity: 1; }
-}
-.cell.warming::before {
-  content: '🔥';
-  position: absolute;
-  font-size: 10px;
-  top: 2px; right: 3px;
-  opacity: 0.95;
-  filter: drop-shadow(0 1px 1px rgba(0,0,0,0.6));
-}
-
-/* Lock flash animation */
-@keyframes lockFlash {
-  0%   { box-shadow: 0 0 0 4px var(--lock-purple), 0 0 0 0 rgba(200,126,255,0.6); transform: scale(1.3); }
-  60%  { box-shadow: 0 0 22px 6px rgba(200,126,255,0.7); transform: scale(0.96); }
-  100% { box-shadow: none; transform: scale(1); }
-}
-.cell.just-locked { animation: lockFlash 0.5s cubic-bezier(0.34,1.56,0.64,1); }
-
-/* Row complete glow ring */
-.cell.row-complete-glow {
-  box-shadow:
-    0 3px 0 0 rgba(0,0,0,0.35),
-    0 6px 10px -2px rgba(0,0,0,0.55),
-    inset 0 2px 3px rgba(255,255,255,0.18),
-    inset 0 -4px 6px rgba(0,0,0,0.3),
-    0 0 0 2px var(--lock-purple),
-    0 0 16px 2px rgba(200,126,255,0.4) !important;
-}
-
-/* Ignition pulse played on each cell as the fire sweep passes through it.
-   Transform-only (no filter animation) — filter forces a real repaint on
-   every keyframe step, and up to 8 of these can run at once during a row
-   completion, which was a meaningful chunk of the lag on that moment. */
-@keyframes ignitePulse {
-  0%   { transform: translateY(0) scale(1); }
-  35%  { transform: translateY(-9px) scale(1.28); }
-  60%  { transform: translateY(-3px) scale(1.1); }
-  100% { transform: translateY(0) scale(1); }
-}
-.cell.ignite {
-  animation: ignitePulse 0.55s cubic-bezier(0.22,1,0.36,1);
-  z-index: 20;
-}
-
-/* Expanding shockwave ring spawned at a cell's center */
-.shock-ring {
-  position: fixed;
-  width: 10px; height: 10px;
-  border-radius: 50%;
-  border: 2px solid var(--fire-1);
-  box-shadow: 0 0 12px 2px rgba(255,209,102,0.6);
-  pointer-events: none;
-  z-index: 65;
-  transform: translate(-50%, -50%) scale(0);
-  animation: shockOut 0.55s cubic-bezier(0.16,1,0.3,1) forwards;
-  will-change: transform, opacity;
-}
-/* transform + opacity only — these composite for free. The old version
-   also animated border-color, which forces a repaint on every keyframe
-   step; up to 8 of these can be running at once during a row completion. */
-@keyframes shockOut {
-  0%   { transform: translate(-50%, -50%) scale(0);   opacity: 0.9; }
-  60%  { opacity: 0.55; }
-  100% { transform: translate(-50%, -50%) scale(5.4); opacity: 0; }
-}
-
-/* Full-row flash sweep that rides behind the ignite wave */
-.row-sweep {
-  position: absolute;
-  top: 0; bottom: 0; left: 0;
-  width: 60px;
-  pointer-events: none;
-  z-index: 18;
-  background: linear-gradient(90deg,
-    transparent 0%,
-    rgba(255,247,214,0.0) 10%,
-    rgba(255,209,102,0.55) 45%,
-    rgba(255,122,61,0.55) 55%,
-    rgba(255,247,214,0.0) 90%,
-    transparent 100%);
-  filter: blur(6px);
-  border-radius: 12px;
-  animation: sweepAcross var(--sweep-dur, 0.65s) linear forwards;
-}
-@keyframes sweepAcross {
-  from { transform: translateX(0); opacity: 1; }
-  to   { transform: translateX(var(--sweep-dist, 400px)); opacity: 0.4; }
-}
-
-/* Whole-screen warm flash on row lock */
-.lock-flash-screen {
-  position: fixed; inset: 0; z-index: 58; pointer-events: none;
-  background: radial-gradient(circle at var(--flash-x,50%) var(--flash-y,50%), rgba(255,209,102,0.16), transparent 60%);
-  animation: screenFlashFade 0.6s ease-out forwards;
-}
-@keyframes screenFlashFade {
-  0%   { opacity: 1; }
-  100% { opacity: 0; }
-}
-
-/* Row labels */
-#game-layout {
-  display: flex; gap: 22px; align-items: flex-start;
-  justify-content: center; flex-wrap: wrap;
-}
-#board-section { display: flex; gap: 0; position: relative; }
-#row-labels {
-  display: flex; flex-direction: column;
-  gap: var(--gap); padding-top: var(--board-pad);
-  justify-content: flex-start;
-  margin-right: var(--label-gap);
-}
-.row-label {
-  width: var(--label-w); height: var(--cell);
-  display: flex; align-items: center; justify-content: flex-end;
-  font-size: calc(var(--cell) * 0.225); color: var(--muted); font-variant-numeric: tabular-nums;
-  font-weight: 600;
-  padding-right: 4px;
-  transition: color 0.3s, text-shadow 0.3s;
-  white-space: nowrap;
-}
-.row-label.correct-row { color: var(--lock-purple); font-weight: 700; text-shadow: 0 0 8px rgba(200,126,255,0.6); }
-
-/* Fire sweep overlay for completed rows */
-.row-fire-track {
-  position: absolute;
-  left: 0; right: 0;
-  height: var(--cell);
-  pointer-events: none;
-  z-index: 50;
-  overflow: visible;
-}
-
-/* ── Side panel ── */
-#side-panel {
-  flex: 0 0 200px;
-  display: flex; flex-direction: column; gap: 14px;
-}
-.info-card {
-  background: linear-gradient(160deg, #151b30 0%, #0f1320 100%);
-  border: 1px solid var(--border);
-  border-radius: 14px; padding: 16px;
-  box-shadow: 0 8px 20px -8px rgba(0,0,0,0.5), 0 1px 0 rgba(255,255,255,0.04) inset;
-}
-.info-card h3 {
-  font-size: 11px; font-weight: 700; color: var(--muted);
-  text-transform: uppercase; letter-spacing: 0.09em; margin-bottom: 13px;
-}
-.legend-item {
-  display: flex; align-items: center; gap: 10px;
-  font-size: 12px; color: var(--muted); margin-bottom: 10px;
-}
-.legend-swatch {
-  width: 21px; height: 21px; border-radius: 6px; flex-shrink: 0;
-  box-shadow: 0 2px 4px -1px rgba(0,0,0,0.5), inset 0 1px 2px rgba(255,255,255,0.15);
-}
-
-/* Progress */
-.prog-row { display: flex; align-items: center; gap: 8px; margin-bottom: 9px; font-size: 12px; }
-.prog-bar-bg { flex: 1; height: 6px; background: #0c0f1a; border-radius: 5px; overflow: hidden; box-shadow: inset 0 1px 2px rgba(0,0,0,0.6); }
-.prog-bar-fill { height: 100%; border-radius: 5px; transition: width 0.4s cubic-bezier(0.4,0,0.2,1); position: relative; }
-.prog-bar-fill::after {
-  content: '';
-  position: absolute; inset: 0;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.35), transparent);
-  animation: shimmer 2s linear infinite;
-}
-@keyframes shimmer { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
-.prog-val { min-width: 32px; text-align: right; font-variant-numeric: tabular-nums; color: var(--text); font-size: 11px; font-weight: 600; }
-#prog-six-fill   { background: linear-gradient(90deg, var(--six-deep), var(--six-text)); box-shadow: 0 0 8px rgba(79,227,255,0.5); }
-#prog-seven-fill { background: linear-gradient(90deg, var(--seven-deep), var(--seven-text)); box-shadow: 0 0 8px rgba(255,98,196,0.5); }
-#prog-locked-fill { background: linear-gradient(90deg, #6e3d99, var(--lock-purple)); box-shadow: 0 0 8px rgba(200,126,255,0.5); }
-
-.limit-val { font-variant-numeric: tabular-nums; font-weight: 700; }
-.limit-val.warn   { color: var(--fire-1); }
-.limit-val.danger { color: var(--danger); animation: dangerPulse 0.8s ease-in-out infinite; }
-@keyframes dangerPulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
-
-/* Gameover overlay */
-.gameover-overlay {
-  display: none; position: fixed; inset: 0; z-index: 100;
-  background: radial-gradient(ellipse at 50% 40%, rgba(40,10,10,0.5), rgba(6,8,16,0.92));
-  backdrop-filter: blur(4px);
-  align-items: center; justify-content: center;
-}
-.gameover-overlay.show { display: flex; }
-.gameover-card {
-  background: linear-gradient(160deg, #1c1420 0%, #120e16 100%);
-  border: 1px solid var(--danger);
-  border-radius: 22px; padding: 42px 50px; text-align: center;
-  max-width: 380px; width: 90%;
-  box-shadow: 0 0 70px rgba(255,84,112,0.22), 0 30px 60px -20px rgba(0,0,0,0.8);
-  animation: cardIn 0.4s cubic-bezier(0.34,1.56,0.64,1);
-}
-.gameover-icon { font-size: 54px; display: block; margin-bottom: 14px; filter: drop-shadow(0 4px 12px rgba(255,84,112,0.4)); }
-.gameover-title { font-size: 25px; font-weight: 800; margin-bottom: 8px; }
-.gameover-reason { font-size: 14px; color: var(--danger); margin-bottom: 22px; font-weight: 600; }
-.gameover-stats { display:flex; gap:26px; justify-content:center; margin-bottom:26px; }
-.go-stat { display:flex; flex-direction:column; gap:5px; }
-.go-stat span { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:0.07em; }
-.go-stat strong { font-size:21px; font-weight:800; color:var(--text); }
-
-/* ── Win overlay ── */
-#win-overlay {
-  display: none; position: fixed; inset: 0; z-index: 100;
-  background: radial-gradient(ellipse at 50% 35%, rgba(20,50,40,0.45), rgba(6,8,16,0.92));
-  backdrop-filter: blur(4px);
-  align-items: center; justify-content: center;
-}
+#win-overlay { display: none; position: fixed; inset: 0; background: radial-gradient(ellipse at 50% 35%, rgba(20,50,40,0.45), rgba(6,8,16,0.92)); backdrop-filter: blur(4px); z-index: 100; align-items: center; justify-content: center; }
 #win-overlay.show { display: flex; }
-#win-card {
-  background: linear-gradient(160deg, #16241c 0%, #0f1620 100%);
-  border: 1px solid #3dba7e;
-  border-radius: 22px; padding: 46px 54px; text-align: center;
-  max-width: 400px; width: 90%;
-  box-shadow: 0 0 80px rgba(61,186,126,0.25), 0 30px 60px -20px rgba(0,0,0,0.8);
-  animation: cardIn 0.45s cubic-bezier(0.34,1.56,0.64,1);
+.win-card {
+  background: linear-gradient(160deg, #16241c 0%, #0f1620 100%); border: 1px solid #3dba7e;
+  border-radius: 22px; padding: 46px 54px; text-align: center; max-width: 400px; width: 90%;
+  box-shadow: 0 0 80px rgba(61,186,126,0.25); color: white;
 }
-@keyframes cardIn {
-  from { transform: scale(0.78) translateY(24px); opacity: 0; }
-  to   { transform: scale(1)    translateY(0);    opacity: 1; }
-}
-#win-trophy { font-size: 58px; margin-bottom: 12px; display: block; animation: bob 2s ease-in-out infinite; filter: drop-shadow(0 6px 16px rgba(255,200,87,0.5)); }
-@keyframes bob { 0%,100%{transform:translateY(0) rotate(-2deg)} 50%{transform:translateY(-10px) rotate(2deg)} }
-#win-title {
-  font-size: 27px; font-weight: 800; margin-bottom: 6px;
-  background: linear-gradient(180deg, #fff, #b9f3cf);
-  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
-}
-#win-sub { font-size: 13px; color: var(--muted); margin-bottom: 24px; line-height: 1.5; }
-#win-badge {
-  display: inline-block; background: linear-gradient(160deg,#1c3a2c,#142a20); border: 1px solid #3dba7e;
-  border-radius: 40px; padding: 10px 26px; font-size: 14px;
-  font-weight: 700; color: var(--seven-text); margin-bottom: 30px;
-  box-shadow: 0 4px 14px -4px rgba(61,186,126,0.4), inset 0 1px 0 rgba(255,255,255,0.06);
-}
-#win-stars { display: flex; justify-content: center; gap: 12px; margin-bottom: 26px; }
-.star { font-size: 32px; animation: starPop 0.45s cubic-bezier(0.34,1.56,0.64,1) both; filter: drop-shadow(0 4px 10px rgba(255,200,87,0.5)); }
-.star:nth-child(1){animation-delay:0.15s}.star:nth-child(2){animation-delay:0.3s}.star:nth-child(3){animation-delay:0.45s}
-@keyframes starPop { from{transform:scale(0) rotate(-25deg);opacity:0} to{transform:scale(1) rotate(0);opacity:1} }
-#win-divider { border: none; border-top: 1px solid var(--border); margin: 0 0 24px; }
-.win-btn-row { display: flex; gap: 10px; justify-content: center; }
-.win-btn { padding: 10px 24px; border-radius: 11px; font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit; transition: transform 0.1s, background 0.15s, filter 0.15s; }
-.win-btn:active { transform: scale(0.95); }
-.win-btn.primary { background: linear-gradient(180deg, #4ed491, #2c9d68); border: 1px solid #3dba7e; color: #06150d; box-shadow: 0 4px 14px -3px rgba(61,186,126,0.45); }
-.win-btn.primary:hover { filter: brightness(1.08); }
-.win-btn.secondary { background: linear-gradient(180deg, #1c2338, #141a2c); border: 1px solid var(--border); color: var(--text); }
-.win-btn.secondary:hover { background: #232b47; border-color: var(--accent); }
-
-/* Confetti */
-#confetti-canvas { position: fixed; inset: 0; pointer-events: none; z-index: 99; }
-#fire-canvas { position: fixed; inset: 0; pointer-events: none; z-index: 60; }
-
-/* Lightning Effect */
-.lightning-bolt {
-  position: fixed;
-  width: 60px;
-  height: 60px;
-  pointer-events: none;
-  z-index: 200;
-  /* A single, smaller drop-shadow instead of two stacked ones — this runs
-     on every swap during active play, and stacked filters on a
-     scaling/rotating element are expensive to re-rasterize each frame. */
-  filter: drop-shadow(0 0 8px rgba(180,210,255,0.85));
-  animation: zap 0.35s ease-out forwards;
-}
-@keyframes zap {
-  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.5) rotate(0deg); }
-  20% { opacity: 1; transform: translate(-50%, -50%) scale(1.2) rotate(10deg); }
-  100% { opacity: 0; transform: translate(-50%, -50%) scale(1) rotate(var(--rot)); }
-}
-
-/* Screen shake for row completion */
-@keyframes screenShake {
-  0%, 100% { transform: translate(0,0); }
-  20% { transform: translate(-4px, 2px); }
-  40% { transform: translate(3px, -3px); }
-  60% { transform: translate(-3px, -1px); }
-  80% { transform: translate(2px, 3px); }
-}
-.shake { animation: screenShake 0.4s ease-in-out; }
-
-/* Row banner */
-.row-banner {
-  position: absolute;
-  left: 50%;
-  padding: 5px 18px;
-  border-radius: 20px;
-  background: linear-gradient(135deg, var(--fire-1), var(--fire-2));
-  color: #2a1300;
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  white-space: nowrap;
-  box-shadow: 0 4px 16px -2px rgba(255,122,61,0.6), 0 0 0 1px rgba(255,255,255,0.25) inset;
-  z-index: 70;
-  pointer-events: none;
-  animation: bannerPop 1.3s cubic-bezier(0.34,1.56,0.64,1) forwards;
-}
-@keyframes bannerPop {
-  0%   { transform: translate(-50%, 10px) scale(0.3) rotate(-4deg); opacity: 0; }
-  18%  { transform: translate(-50%, -8px) scale(1.18) rotate(2deg); opacity: 1; }
-  30%  { transform: translate(-50%, -3px) scale(1) rotate(0deg); opacity: 1;
-         background: linear-gradient(135deg, var(--fire-1), var(--fire-2)); color: #2a1300; }
-  55%  { background: linear-gradient(135deg, #e3b8ff, var(--lock-purple)); color: #200a33; }
-  85%  { transform: translate(-50%, -3px) scale(1); opacity: 1;
-         background: linear-gradient(135deg, #e3b8ff, var(--lock-purple)); color: #200a33; }
-  100% { transform: translate(-50%, -20px) scale(0.9); opacity: 0;
-         background: linear-gradient(135deg, #e3b8ff, var(--lock-purple)); color: #200a33; }
-}
-
-/* ── RESPONSIVE ─────────────────────────────────────────────────── */
-
-/* Prevent accidental body scroll while dragging/tapping the board */
-#board { touch-action: none; }
+#win-trophy { font-size: 58px; margin-bottom: 12px; display: block; }
+#win-title { font-size: 27px; font-weight: 800; margin-bottom: 6px; background: linear-gradient(180deg, #fff, #b9f3cf); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+#win-sub { font-size: 13px; color: #828aae; margin-bottom: 24px; line-height: 1.5; }
+#win-badge { display: inline-block; background: linear-gradient(160deg,#1c3a2c,#142a20); border: 1px solid #3dba7e; border-radius: 40px; padding: 10px 26px; font-size: 14px; font-weight: 700; color: #ff62c4; margin-bottom: 30px; }
 
 @media (max-width: 700px) {
-  body { padding: 14px 12px 24px; padding-bottom: max(24px, env(safe-area-inset-bottom)); }
-
-  /* Level select: 2 columns on narrow screens */
   #level-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
-  .level-card { padding: 16px 10px 14px; gap: 4px; }
+  .level-card { padding: 16px 10px 14px; }
   .level-card-icon { font-size: 24px; }
   .level-card-label { font-size: 13px; }
-  .level-card-sub { font-size: 10px; min-height: 22px; }
-  .level-card-meta { font-size: 9px; }
-  .level-card-best { font-size: 10px; padding: 2px 8px; }
-
-  /* Header */
-  header { margin-bottom: 12px; }
-  header h1 { font-size: 21px; }
-  header p { font-size: 11.5px; }
-
-  /* Panels */
-  #panel-game, #panel-levels { max-width: 100%; }
-
-  /* Level header */
-  #level-header { margin-bottom: 8px; padding: 8px 10px; border-radius: 12px; }
-  #level-header-title { font-size: 13px; }
-  #level-header-spacer { width: 64px; }
-
-  /* Controls: shrink chips, tighten gap */
-  #controls { gap: 6px; margin-bottom: 8px; }
-  .stat-chip { font-size: 11px; padding: 5px 9px; gap: 4px; border-radius: 8px; }
-  button.ctrl-btn { font-size: 11px; padding: 5px 11px; border-radius: 8px; }
-
-  /* Status bar */
-  #status { font-size: 11px; margin-bottom: 8px; }
-
-  /* Board layout: stack board and side panel vertically */
-  #game-layout { flex-direction: column; align-items: center; gap: 10px; }
-  #side-panel { flex: none; width: 100%; flex-direction: row; flex-wrap: wrap; gap: 10px; }
-  .info-card { flex: 1; min-width: 140px; padding: 12px; }
-  .info-card h3 { margin-bottom: 8px; }
-  .legend-item { font-size: 11px; gap: 7px; margin-bottom: 7px; }
-
-  /* Board wrap: cell size itself is computed by JS (fitBoard) */
-  #board-section { width: 100%; justify-content: center; }
-  .board-wrap { border-radius: 14px; }
-
-  /* Tutorial card on mobile: full width, pinned at bottom of screen */
-  #tut-card {
-    width: calc(100vw - 32px) !important;
-    left: 16px !important;
-    top: auto !important;
-    bottom: 16px;
-    position: fixed !important;
-    border-radius: 16px;
-  }
-  /* Compact variant on mobile — still bottom-pinned but slightly shorter */
-  #tut-card.compact {
-    width: calc(100vw - 32px) !important;
-    left: 16px !important;
-    bottom: 16px;
-    padding: 12px 14px 10px !important;
-  }
-  #tut-card.compact #tut-body { font-size: 11px !important; }
-  #tut-card.compact #tut-icon { font-size: 22px !important; }
-  #tut-card.compact #tut-title { font-size: 12px !important; }
-  #tut-card.compact .tut-knight-diagram { width: 80px !important; height: 80px !important; }
-}
-
-@media (max-width: 400px) {
-  /* Very small phones: 2 col level grid stays but smaller */
-  #level-grid { gap: 8px; }
-  .level-card { padding: 13px 8px 11px; }
-}
-
-/* Scroll lock applied via JS during tutorial */
-body.tut-lock { overflow: hidden !important; position: fixed; width: 100%; }
-
-/* ── Tutorial overlay ── */
-#tut-overlay {
-  display: none;
-  position: fixed; inset: 0; z-index: 300;
-  pointer-events: none;
-}
-#tut-overlay.active { display: block; pointer-events: none; }
-
-#tut-canvas {
-  position: absolute; inset: 0; width: 100%; height: 100%;
-  pointer-events: none;
-}
-
-#tut-card {
-  position: absolute; width: 290px;
-  background: linear-gradient(160deg, #1c2340 0%, #141828 100%);
-  border: 1px solid var(--accent); border-radius: 18px;
-  padding: 22px 22px 18px;
-  box-shadow: 0 0 0 1px rgba(111,168,255,0.15), 0 24px 48px -12px rgba(0,0,0,0.8), 0 0 40px -10px rgba(111,168,255,0.3);
-  transition: top 0.4s cubic-bezier(0.34,1.26,0.64,1), left 0.4s cubic-bezier(0.34,1.26,0.64,1), opacity 0.25s;
-  pointer-events: all;
-}
-
-#tut-step-dots { display: flex; gap: 5px; margin-bottom: 14px; }
-.tut-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--border); transition: background 0.2s, transform 0.2s; }
-.tut-dot.active { background: var(--accent); transform: scale(1.35); }
-.tut-dot.done { background: #3dba7e; }
-
-#tut-icon { font-size: 32px; line-height: 1; margin-bottom: 10px; filter: drop-shadow(0 3px 8px rgba(0,0,0,0.5)); }
-#tut-title {
-  font-size: 15px; font-weight: 800; margin-bottom: 8px;
-  background: linear-gradient(135deg, #fff 30%, var(--accent));
-  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
-}
-#tut-body { font-size: 13px; color: var(--muted); line-height: 1.65; margin-bottom: 18px; }
-#tut-body strong { color: var(--text); -webkit-text-fill-color: var(--text); }
-#tut-body .cyan  { color: var(--six-text);   -webkit-text-fill-color: var(--six-text);   font-weight: 700; }
-#tut-body .pink  { color: var(--seven-text); -webkit-text-fill-color: var(--seven-text); font-weight: 700; }
-
-#tut-actions { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.tut-btn-skip {
-  background: none; border: none; color: var(--muted); font-size: 12px;
-  cursor: pointer; font-family: inherit; padding: 4px 0; transition: color 0.15s;
-}
-.tut-btn-skip:hover { color: var(--text); }
-.tut-btn-next {
-  background: linear-gradient(180deg, var(--accent), #4a7de8);
-  border: none; color: #050c20; font-size: 13px; font-weight: 800;
-  padding: 9px 18px; border-radius: 10px; cursor: pointer; font-family: inherit;
-  box-shadow: 0 4px 14px -4px rgba(111,168,255,0.55), inset 0 1px 0 rgba(255,255,255,0.25);
-  transition: filter 0.15s, transform 0.1s;
-}
-.tut-btn-next:hover { filter: brightness(1.1); }
-.tut-btn-next:active { transform: scale(0.96); }
-.tut-btn-next:disabled { opacity: 0.4; cursor: default; filter: none; }
-
-/* Step 3 only: smaller card pushed right so it doesn't cover the board */
-#tut-card.compact {
-  width: 193px;
-  padding: 14px 14px 12px;
-}
-#tut-card.compact #tut-icon    { font-size: 21px; margin-bottom: 6px; }
-#tut-card.compact #tut-title   { font-size: 10px; margin-bottom: 5px; }
-#tut-card.compact #tut-body    { font-size: 8.5px; line-height: 1.5; margin-bottom: 10px; }
-#tut-card.compact #tut-step-dots { margin-bottom: 9px; }
-#tut-card.compact .tut-btn-next { font-size: 8.5px; padding: 6px 10px; }
-#tut-card.compact .tut-btn-skip { font-size: 8px; }
-#tut-card.compact .tut-knight-diagram { width: 70px; height: 70px; margin: 6px auto 4px; }
-
-.tut-spotlight-ring {
-  position: fixed; border-radius: 14px;
-  border: 2.5px solid var(--accent);
-  box-shadow: 0 0 0 3px rgba(111,168,255,0.2), 0 0 24px 4px rgba(111,168,255,0.4);
-  pointer-events: none; z-index: 301;
-  animation: spotPulse 1.6s ease-in-out infinite;
-}
-@keyframes spotPulse {
-  0%,100% { box-shadow: 0 0 0 3px rgba(111,168,255,0.2), 0 0 20px 3px rgba(111,168,255,0.35); }
-  50%      { box-shadow: 0 0 0 5px rgba(111,168,255,0.3), 0 0 32px 8px rgba(111,168,255,0.55); }
-}
-
-.tut-knight-diagram { display: block; margin: 10px auto 8px; border-radius: 8px; }
-
-@keyframes tapHint {
-  0%   { transform: translate(-50%,-50%) scale(0.8); opacity: 0.8; }
-  70%  { transform: translate(-50%,-50%) scale(1.4); opacity: 0.2; }
-  100% { transform: translate(-50%,-50%) scale(1.7); opacity: 0; }
-}
-.tap-hint-ring {
-  position: fixed; width: 54px; height: 54px; border-radius: 50%;
-  border: 2px solid rgba(111,168,255,0.75);
-  pointer-events: none; z-index: 302;
-  animation: tapHint 1.5s ease-out infinite;
 }
 </style>
 </head>
 <body>
 
-<!-- Everything that isn't position:fixed lives inside this wrapper. The
-     screen-shake effect animates THIS element's transform, not <body> —
-     if body itself gets a transform, every position:fixed element on the
-     page (canvases, shockwave rings, flash, banner, tutorial overlay)
-     stops being cheaply pinned to the viewport and has to be recomputed
-     like an absolutely-positioned element instead, every frame, for as
-     long as the transform is active. That was happening on every single
-     row completion (which is exactly when a burst of fixed fx elements
-     spawns), and was very likely the real source of the lag. -->
-<div id="shake-target">
-
 <header>
-  <h1>⚔ Knight Swap</h1>
+  <h1> Knight Swap</h1>
   <p>Arrange rows so each is all 6s or all 7s, alternating. Swap pieces using chess knight moves.</p>
 </header>
 
-<!-- ══════════════ LEVEL SELECT ══════════════ -->
 <div id="panel-levels" class="panel active">
   <div id="level-grid"></div>
 </div>
 
-<!-- ══════════════ GAME PANEL ══════════════ -->
 <div id="panel-game" class="panel">
-  <div id="level-header">
-    <button class="ctrl-btn" id="levels-back-btn">← Levels</button>
-    <div id="level-header-title">
-      <span id="level-header-icon">🎓</span>
-      <span id="level-header-label">Tutorial</span>
-    </div>
-    <div id="level-header-spacer"></div>
-  </div>
   <div id="controls">
-    <div class="stat-chip" id="move-count">Moves: <span class="val" id="mc">0</span></div>
-    <div class="stat-chip" id="time-display-wrap">Time: <span id="timer-display" class="limit-val">0s</span></div>
-    <div class="stat-chip" id="locked-count">Locked: <span class="val" id="lc">0</span>/<span id="total-cells">112</span></div>
+    <div class="stat-chip">Moves: <span id="mc">0</span></div>
+    <div class="stat-chip">Locked: <span id="lc">0</span>/<span id="total-cells">112</span></div>
     <button class="ctrl-btn" id="reset-btn">↺ Reset</button>
+    <button class="ctrl-btn" id="levels-back-btn">← Levels</button>
   </div>
-  <div id="status">Select a piece to move it via a knight jump.</div>
-
-  <div id="game-layout">
-    <div id="board-section">
-      <div id="row-labels"></div>
-      <div class="board-wrap">
-        <div id="board" class="board-grid" role="grid"></div>
-        <div id="row-fx-layer" style="position:absolute; inset:14px; pointer-events:none;"></div>
-      </div>
-    </div>
-    <div id="side-panel">
-      <div class="info-card">
-        <h3>Legend</h3>
-        <div class="legend-item">
-          <div class="legend-swatch" style="background:linear-gradient(150deg, var(--six-text), var(--six-deep));"></div>
-          6 — goes in even rows
-        </div>
-        <div class="legend-item">
-          <div class="legend-swatch" style="background:linear-gradient(150deg, var(--seven-text), var(--seven-deep));"></div>
-          7 — goes in odd rows
-        </div>
-        <div class="legend-item">
-          <div class="legend-swatch" style="background:linear-gradient(150deg, var(--six-text), var(--six-deep));opacity:0.5;font-size:9px;display:flex;align-items:center;justify-content:center;">🔒</div>
-          Locked in place
-        </div>
-        <div class="legend-item" id="legend-warming" style="display:none;">
-          <div class="legend-swatch" style="background:linear-gradient(150deg, var(--six-text), var(--six-deep));border:1.5px solid var(--fire-1);font-size:9px;display:flex;align-items:center;justify-content:center;">🔥</div>
-          1 more to lock
-        </div>
-        <div class="legend-item">
-          <div class="legend-swatch" style="background:var(--surface2);border:1.5px solid var(--lock-purple);"></div>
-          Row fully correct
-        </div>
-      </div>
-      <div class="info-card">
-        <h3>Progress</h3>
-        <div class="prog-row">
-          <span style="color:var(--six-text);font-weight:700;min-width:12px;">6</span>
-          <div class="prog-bar-bg"><div class="prog-bar-fill" id="prog-six-fill" style="width:0%"></div></div>
-          <span class="prog-val" id="prog-six-val">0%</span>
-        </div>
-        <div class="prog-row">
-          <span style="color:var(--seven-text);font-weight:700;min-width:12px;">7</span>
-          <div class="prog-bar-bg"><div class="prog-bar-fill" id="prog-seven-fill" style="width:0%"></div></div>
-          <span class="prog-val" id="prog-seven-val">0%</span>
-        </div>
-        <div class="prog-row" style="margin-top:4px;">
-          <span style="color:var(--lock-purple);font-weight:700;min-width:12px;">🔒</span>
-          <div class="prog-bar-bg"><div class="prog-bar-fill" id="prog-locked-fill" style="width:0%"></div></div>
-          <span class="prog-val" id="prog-locked-val">0%</span>
-        </div>
-      </div>
-    </div>
-  </div>
+  <div id="phaser-container"></div>
 </div>
 
-</div><!-- /#shake-target -->
-
-<!-- Tutorial overlay -->
-<div id="tut-overlay">
-  <canvas id="tut-canvas"></canvas>
-  <div id="tut-card">
-    <div id="tut-step-dots"></div>
-    <div id="tut-icon"></div>
-    <div id="tut-title"></div>
-    <div id="tut-body"></div>
-    <div id="tut-actions">
-      <button id="tut-skip" class="tut-btn-skip">Skip tutorial</button>
-      <button id="tut-next" class="tut-btn-next">Got it →</button>
-    </div>
-  </div>
-</div>
-
-<!-- Win/Loss overlays -->
-<canvas id="confetti-canvas"></canvas>
-<canvas id="fire-canvas"></canvas>
 <div id="win-overlay">
-  <div id="win-card">
-    <span id="win-trophy">🏆</span>
-    <div id="win-stars"><span class="star">⭐</span><span class="star">⭐</span><span class="star">⭐</span></div>
+  <div class="win-card">
+    <span id="win-trophy"></span>
     <div id="win-title">Puzzle Complete!</div>
     <div id="win-sub">All rows are correct.<br>Every piece is home.</div>
-    <div id="win-badge">Solved in <span id="win-mc">0</span> moves · <span id="win-time">0s</span></div>
-    <hr id="win-divider">
-    <div class="win-btn-row">
-      <button class="win-btn secondary" id="win-close-btn">← Levels</button>
-      <button class="win-btn primary"   id="win-reset-btn">Next Level →</button>
-    </div>
-  </div>
-</div>
-
-<!-- Gameover overlay -->
-<div id="gameover-overlay" class="gameover-overlay">
-  <div class="gameover-card">
-    <span class="gameover-icon">💀</span>
-    <div class="gameover-title">Game Over</div>
-    <div class="gameover-reason" id="gameover-reason"></div>
-    <div class="gameover-stats">
-      <div class="go-stat"><span>Moves</span><strong id="gameover-moves">0</strong></div>
-      <div class="go-stat"><span>Time</span><strong id="gameover-time">0s</strong></div>
-    </div>
-    <div class="win-btn-row">
-      <button class="win-btn secondary" id="go-close-btn">See board</button>
-      <button class="win-btn primary"   id="go-retry-btn">Try again</button>
-    </div>
+    <div id="win-badge">Solved in <span id="win-mc">0</span> moves</div>
+    <button class="ctrl-btn" style="background: linear-gradient(180deg, #4ed491, #2c9d68); border-color: #3dba7e; color: #06150d; font-weight:800; padding: 10px 24px;" onclick="closeWin()">Continue</button>
   </div>
 </div>
 
 <script>
+// ══════════════════════════════════════════
+//  GAME LOGIC
 // ═══════════════════════════════════════════
-//  Constants & state
-// ═══════════════════════════════════════════
-const ROWS = 14, COLS = 8; 
+const ROWS = 14, COLS = 8;
+let currentLevelIndex = 0, grid = [], walls = new Set(), locked = [], moves = 0;
+let game, gameScene;
+let rowsCompletedBefore = new Set();
 
-// Detected once: lets us dial back particle counts / effect intensity on
-// phones and tablets, where GPU/CPU headroom is much lower than desktop.
-const IS_TOUCH = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
-
-// Coalesces rapid-fire `resize` events (very common on Android during
-// keyboard show/hide, rotation, and browser-chrome show/hide) down to at
-// most one handler run per animation frame, instead of running expensive
-// layout-reading code (getBoundingClientRect etc.) on every single event.
-function rafThrottle(fn) {
-  let scheduled = false;
-  return (...args) => {
-    if (scheduled) return;
-    scheduled = true;
-    requestAnimationFrame(() => { scheduled = false; fn(...args); });
-  };
-}
-
-// ── LEVELS ──
-// Tutorial has zero walls so the player learns the knight-move + lock rules
-// with nothing else to think about. Levels 1-5 ramp up wall density (and
-// therefore difficulty/tightness of the puzzle) for a real progression curve.
-// The Infinite level is fully randomized (wall count + lock threshold) and
-// re-rolled every single time it's played, so it's handled specially below.
 const LEVELS = [
-  { id: 0, label: 'Tutorial', subtitle: 'Learn the moves',      walls: 0,  threshold: 1, icon: '🎓' },
-  { id: 1, label: 'Level 1',  subtitle: 'Warming up',           walls: 10, threshold: 1, icon: '①' },
-  { id: 2, label: 'Level 2',  subtitle: 'Getting tighter',      walls: 16, threshold: 1, icon: '②' },
-  { id: 3, label: 'Level 3',  subtitle: 'Mind the gaps',        walls: 21, threshold: 1, icon: '③' },
-  { id: 4, label: 'Level 4',  subtitle: 'Double-lock unlocked',  walls: 26, threshold: 2, icon: '④' },
-  { id: 5, label: 'Level 5',  subtitle: 'The gauntlet',         walls: 30, threshold: 2, icon: '⑤' },
-  { id: 6, label: 'Infinite', subtitle: 'Endless random puzzles', walls: null, threshold: null, icon: '♾️', infinite: true },
+  { id: 0, label: 'Tutorial', subtitle: 'Learn the moves', walls: 0, icon: '🎓' },
+  { id: 1, label: 'Level 1', subtitle: 'Warming up', walls: 10, icon: '①' },
+  { id: 2, label: 'Level 2', subtitle: 'Getting tighter', walls: 16, icon: '②' },
+  { id: 3, label: 'Level 3', subtitle: 'Mind the gaps', walls: 21, icon: '③' },
+  { id: 4, label: 'Level 4', subtitle: 'Double-lock unlocked', walls: 26, icon: '④' },
+  { id: 5, label: 'Level 5', subtitle: 'The gauntlet', walls: 30, icon: '⑤' },
 ];
 
-let currentLevelIndex = 0;
-// Per-level best results, kept in memory for this session: { completed, bestMoves }
-let levelProgress = LEVELS.map(() => ({ completed: false, bestMoves: null }));
+const wallKey = (r, c) => r + ',' + c;
+const isWall = (r, c) => walls.has(wallKey(r, c));
+const goalValue = (r) => r % 2 === 0 ? 6 : 7;
+const isCorrect = (r, c, val) => !isWall(r,c) && val === goalValue(r);
 
-let lockThreshold = 1;
-let moveLimit = 0;      
-let timeLimit = 0;      
-let timerInterval = null;
-let timeElapsed = 0;
-let gameover = false;
-
-let grid = [];       
-let walls = new Set(); 
-let locked = [];     
-let visits = [];     
-let initCorrect = [];
-let selected = null;
-let reachable = [];
-let moves = 0;
-let history = [];
-let winShown = false;
-let rowsCompletedBefore = new Set(); // track which rows already fired their completion fx
-let swapInProgress = false; // true while a swap animation is mid-flight; blocks new input
-
-function wallKey(r, c) { return r + ',' + c; }
-function isWall(r, c) { return walls.has(wallKey(r, c)); }
-function goalValue(r) { return r % 2 === 0 ? 6 : 7; }
-function isCorrect(r, c, val) { return !isWall(r,c) && val === goalValue(r); }
-
-const CORNER_NEIGHBORS = {
-  '0,0': [[1,2],[2,1]], '0,7': [[1,5],[2,6]],
-  '13,0': [[11,1],[12,2]], '13,7': [[11,6],[12,5]],
-};
-
-function placeWalls(nWalls) {
-  if (nWalls <= 0) return new Set();
-  const allCells = [];
-  for (let r=0; r<ROWS; r++) for (let c=0; c<COLS; c++) allCells.push([r,c]);
-
-  for (let attempt = 0; attempt < 50000; attempt++) {
-    const pool = allCells.slice();
-    for (let i=pool.length-1; i>pool.length-1-nWalls; i--) {
-      const j = Math.floor(Math.random()*(i+1));
-      [pool[i], pool[j]] = [pool[j], pool[i]];
-    }
-    const wallSet = new Set(pool.slice(pool.length-nWalls).map(([r,c])=>wallKey(r,c)));
-
-    let valid = true;
-    for (const [cornerKey, nbrs] of Object.entries(CORNER_NEIGHBORS)) {
-      if (!wallSet.has(cornerKey) && nbrs.every(([nr,nc]) => wallSet.has(wallKey(nr,nc)))) {
-        valid = false; break;
-      }
-    }
-    if (!valid) continue;
-
-    for (let r=0; r<ROWS && valid; r++) {
-      for (let c=0; c<COLS && valid; c++) {
-        if (wallSet.has(wallKey(r,c))) continue;
-        const nbrs = rawKnightMoves(r,c);
-        if (nbrs.length > 0 && nbrs.every(([nr,nc]) => wallSet.has(wallKey(nr,nc)))) {
-          valid = false;
-        }
-      }
-    }
-    if (!valid) continue;
-    return wallSet;
-  }
-  return new Set(); 
-}
-
-function deepCopy(g) { return g.map(row => [...row]); }
-let savedStart = null;
-let savedWalls = new Set();
-
-function generateAndSave(wallCount) {
-  savedWalls = placeWalls(wallCount); 
-  savedStart = makeShuffledStart(savedWalls);
-}
-
-function makeShuffledStart(wallSet) {
-  const nonWallByPos = [];
-  let sixCount = 0, sevenCount = 0;
-  for (let r = 0; r < ROWS; r++) {
-    for (let c = 0; c < COLS; c++) {
-      if (!wallSet.has(wallKey(r, c))) {
-        nonWallByPos.push([r, c]);
-        if (r % 2 === 0) sixCount++; else sevenCount++;
-      }
-    }
+function generateLevel(wallCount) {
+  walls.clear();
+  grid = Array.from({length: ROWS}, () => Array(COLS).fill(0));
+  locked = Array.from({length: ROWS}, () => Array(COLS).fill(false));
+  rowsCompletedBefore.clear();
+  
+  let placed = 0;
+  while(placed < wallCount) {
+    let r = Math.floor(Math.random() * ROWS), c = Math.floor(Math.random() * COLS);
+    if(!walls.has(wallKey(r,c))) { walls.add(wallKey(r,c)); placed++; }
   }
 
-  const pieces = Array(sixCount).fill(6).concat(Array(sevenCount).fill(7));
+  let pieces = [];
+  for(let r=0; r<ROWS; r++) for(let c=0; c<COLS; c++) if(!isWall(r,c)) pieces.push(goalValue(r));
+  
   for (let i = pieces.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [pieces[i], pieces[j]] = [pieces[j], pieces[i]];
   }
 
-  const g = Array.from({length: ROWS}, () => Array(COLS).fill(0));
-  nonWallByPos.forEach(([r, c], i) => { g[r][c] = pieces[i]; });
+  let idx = 0;
+  for(let r=0; r<ROWS; r++) for(let c=0; c<COLS; c++) if(!isWall(r,c)) grid[r][c] = pieces[idx++];
 
-  for (let i = 0; i < 400; i++) {
-    const [r1, c1] = nonWallByPos[Math.floor(Math.random() * nonWallByPos.length)];
-    const nbrs = rawKnightMoves(r1, c1).filter(([nr, nc]) => !wallSet.has(wallKey(nr, nc)));
-    if (!nbrs.length) continue;
-    const [r2, c2] = nbrs[Math.floor(Math.random() * nbrs.length)];
-    [g[r1][c1], g[r2][c2]] = [g[r2][c2], g[r1][c1]];
-  }
-  return g;
-}
-
-function initGame(regenerate) {
-  const level = LEVELS[currentLevelIndex];
-  let wallCount = level.walls;
-  let threshold = level.threshold;
-
-  // Infinite mode: roll brand-new random parameters every single time
-  // (fresh wall count + fresh lock threshold), and always regenerate.
-  if (level.infinite) {
-    wallCount = 8 + Math.floor(Math.random() * 26); // 8–33 walls
-    threshold = Math.random() < 0.5 ? 1 : 2;
-    regenerate = true;
-  }
-
-  lockThreshold = threshold;
-  if (regenerate || !savedStart) generateAndSave(wallCount);
-  walls = new Set(savedWalls);
-  grid = deepCopy(savedStart);
-  locked = Array.from({length:ROWS}, () => Array(COLS).fill(false));
-  visits = Array.from({length:ROWS}, () => Array(COLS).fill(0));
-  initCorrect = Array.from({length:ROWS}, (_,r) =>
-    Array.from({length:COLS}, (__,c) => isCorrect(r, c, grid[r][c]))
-  );
-  selected = null; reachable = []; moves = 0; history = []; winShown = false;
-  gameover = false;
-  swapInProgress = false;
-  rowsCompletedBefore = new Set();
-  if (typeof tutEnd === 'function' && tutActive) tutEnd();
-  stopTimer();
-  timeElapsed = 0;
-  startTimer();
-  document.getElementById('legend-warming').style.display = lockThreshold === 2 ? '' : 'none';
-  updateLevelHeader();
-  renderGame();
-  fitBoard();
-  if (currentLevelIndex === 0 && regenerate) {
-    setTimeout(startTutorial, 600);
-  }
-}
-
-function startTimer() {
-  stopTimer();
-  timerInterval = setInterval(() => {
-    if (gameover || winShown) { stopTimer(); return; }
-    timeElapsed++;
-    updateTimerDisplay();
-    if (timeLimit > 0 && timeElapsed >= timeLimit) {
-      stopTimer();
-      triggerGameover('⏱ Time\'s up!');
+  for(let i=0; i<300; i++) {
+    let r1 = Math.floor(Math.random()*ROWS), c1 = Math.floor(Math.random()*COLS);
+    if(isWall(r1,c1)) continue;
+    let validMoves = getKnightMoves(r1, c1);
+    if(validMoves.length > 0) {
+      let [r2, c2] = validMoves[Math.floor(Math.random()*validMoves.length)];
+      [grid[r1][c1], grid[r2][c2]] = [grid[r2][c2], grid[r1][c1]];
     }
-  }, 1000);
-}
-function stopTimer() {
-  if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
-}
-function formatTime(secs) {
-  const m = Math.floor(secs / 60), s = secs % 60;
-  return m > 0 ? `${m}:${String(s).padStart(2,'0')}` : `${s}s`;
-}
-function updateTimerDisplay() {
-  const el = document.getElementById('timer-display');
-  if (!el) return;
-  if (timeLimit > 0) {
-    const remaining = Math.max(0, timeLimit - timeElapsed);
-    el.textContent = formatTime(remaining);
-    el.className = remaining <= 10 ? 'limit-val danger' : remaining <= 30 ? 'limit-val warn' : 'limit-val';
-  } else {
-    el.textContent = formatTime(timeElapsed);
-    el.className = 'limit-val';
   }
 }
-function triggerGameover(reason) {
-  gameover = true;
-  selected = null; reachable = [];
-  stopTimer();
-  document.getElementById('gameover-reason').textContent = reason;
-  document.getElementById('gameover-moves').textContent = moves;
-  document.getElementById('gameover-time').textContent = formatTime(timeElapsed);
-  document.getElementById('gameover-overlay').classList.add('show');
+
+function getKnightMoves(r, c) {
+  const deltas = [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]];
+  return deltas.map(([dr,dc]) => [r+dr, c+dc])
+    .filter(([nr,nc]) => nr>=0 && nr<ROWS && nc>=0 && nc<COLS && !isWall(nr,nc));
 }
 
-const KNIGHT_DELTAS = [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]];
-function rawKnightMoves(r, c) {
-  return KNIGHT_DELTAS.map(([dr,dc])=>[r+dr,c+dc])
-    .filter(([nr,nc])=>nr>=0&&nr<ROWS&&nc>=0&&nc<COLS);
-}
-function knightMoves(r, c) {
-  return rawKnightMoves(r,c).filter(([nr,nc])=>!isWall(nr,nc));
-}
+// ═══════════════════════════════════════════
+//  PHASER SCENE
+// ═══════════════════════════════════════════
+class MainScene extends Phaser.Scene {
+  constructor() { super('MainScene'); }
 
-function pushHistory() {
-  history.push({
-    grid: deepCopy(grid),
-    locked: locked.map(r => [...r]),
-    visits: visits.map(r => [...r]),
-    moves
-  });
-  if (history.length > 80) history.shift();
-}
+  preload() {
+    this.generatePieceTexture('piece_6', '#4fe3ff', '#1aa8d9', '#0c5e85');
+    this.generatePieceTexture('piece_7', '#ff62c4', '#d62e96', '#831a63');
+    this.generateWallTexture();
+    this.generateGlowTextures();
+    this.generateEffectTextures();
+    
+    let gfx = this.make.graphics({x:0, y:0, add:false});
+    gfx.fillStyle(0xffffff);
+    gfx.fillCircle(16, 16, 16);
+    gfx.generateTexture('flare', 32, 32);
+    gfx.destroy();
+  }
 
-function getCoords(el) {
-  const rect = el.getBoundingClientRect();
-  return { x: rect.left + rect.width/2, y: rect.top + rect.height/2 };
-}
+  generatePieceTexture(key, c1, c2, c3) {
+    const size = 128;
+    const canvas = document.createElement('canvas');
+    canvas.width = size; canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    
+    ctx.shadowColor = 'rgba(0,0,0,0.55)';
+    ctx.shadowBlur = 10;
+    ctx.shadowOffsetY = 6;
+    
+    const grad = ctx.createLinearGradient(0, 128, 128, 0);
+    grad.addColorStop(0, c3);
+    grad.addColorStop(0.48, c2);
+    grad.addColorStop(1, c1);
+    
+    this.roundRect(ctx, 14, 14, 100, 100, 28);
+    ctx.fillStyle = grad;
+    ctx.fill();
+    
+    ctx.shadowColor = 'transparent';
+    
+    const radGrad = ctx.createRadialGradient(41, 36, 0, 41, 36, 45);
+    radGrad.addColorStop(0, key === 'piece_6' ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.5)');
+    radGrad.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = radGrad;
+    this.roundRect(ctx, 14, 14, 100, 100, 28);
+    ctx.fill();
+    
+    const innerGrad = ctx.createLinearGradient(64, 80, 64, 114);
+    innerGrad.addColorStop(0, 'rgba(0,0,0,0)');
+    innerGrad.addColorStop(1, 'rgba(0,0,0,0.3)');
+    ctx.fillStyle = innerGrad;
+    this.roundRect(ctx, 14, 14, 100, 100, 28);
+    ctx.fill();
+    
+    ctx.strokeStyle = c1 + '88';
+    ctx.lineWidth = 1.5;
+    this.roundRect(ctx, 14, 14, 100, 100, 28);
+    ctx.stroke();
+    
+    this.textures.addCanvas(key, canvas);
+  }
 
-function spawnLightning(x1, y1, x2, y2) {
-  const svgNS = "http://www.w3.org/2000/svg";
-  const svg = document.createElementNS(svgNS, "svg");
-  svg.setAttribute("class", "lightning-bolt");
-  svg.setAttribute("viewBox", "0 0 100 100");
-  
-  // Randomize rotation slightly
-  const angle = Math.atan2(y2-y1, x2-x1) * 180 / Math.PI;
-  svg.style.setProperty('--rot', `${angle + 90}deg`);
-  svg.style.left = `${(x1+x2)/2}px`;
-  svg.style.top = `${(y1+y2)/2}px`;
+  generateWallTexture() {
+    const size = 128;
+    const canvas = document.createElement('canvas');
+    canvas.width = size; canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    
+    const grad = ctx.createRadialGradient(64, 45, 0, 64, 64, 60);
+    grad.addColorStop(0, '#1a1e30');
+    grad.addColorStop(0.75, '#0c0e18');
+    
+    ctx.fillStyle = grad;
+    this.roundRect(ctx, 14, 14, 100, 100, 28);
+    ctx.fill();
+    
+    ctx.strokeStyle = 'rgba(255,255,255,0.03)';
+    ctx.lineWidth = 1.5;
+    this.roundRect(ctx, 14, 14, 100, 100, 28);
+    ctx.stroke();
+    
+    this.textures.addCanvas('piece_wall', canvas);
+  }
 
-  const path = document.createElementNS(svgNS, "path");
-  path.setAttribute("d", "M50 10 L30 45 L55 45 L40 90 L80 40 L55 40 L70 10 Z");
-  path.setAttribute("fill", "#fff");
-  
-  svg.appendChild(path);
-  document.body.appendChild(svg);
-  
-  setTimeout(() => svg.remove(), 350);
-}
+  generateGlowTextures() {
+    let canvas = document.createElement('canvas');
+    canvas.width = 140; canvas.height = 140;
+    let ctx = canvas.getContext('2d');
+    ctx.shadowColor = '#7db8ff';
+    ctx.shadowBlur = 22;
+    ctx.strokeStyle = '#7db8ff';
+    ctx.lineWidth = 2.5;
+    this.roundRect(ctx, 20, 20, 100, 100, 28);
+    ctx.stroke();
+    this.textures.addCanvas('glow_select', canvas);
+    
+    canvas = document.createElement('canvas');
+    canvas.width = 140; canvas.height = 140;
+    ctx = canvas.getContext('2d');
+    const grad = ctx.createRadialGradient(70, 70, 30, 70, 70, 70);
+    grad.addColorStop(0, 'rgba(255,255,255,0.16)');
+    grad.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 140, 140);
+    ctx.shadowColor = 'rgba(255,255,255,0.22)';
+    ctx.shadowBlur = 10;
+    ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+    ctx.lineWidth = 1.5;
+    this.roundRect(ctx, 20, 20, 100, 100, 28);
+    ctx.stroke();
+    this.textures.addCanvas('glow_reach', canvas);
+  }
 
-function animateSwap(el1, el2, callback) {
-  const pos1 = getCoords(el1);
-  const pos2 = getCoords(el2);
+  generateEffectTextures() {
+    let canvas = document.createElement('canvas');
+    canvas.width = 100; canvas.height = 100;
+    let ctx = canvas.getContext('2d');
+    ctx.strokeStyle = '#ffd166';
+    ctx.lineWidth = 2;
+    ctx.shadowColor = 'rgba(255,209,102,0.6)';
+    ctx.shadowBlur = 12;
+    ctx.beginPath();
+    ctx.arc(50, 50, 40, 0, Math.PI * 2);
+    ctx.stroke();
+    this.textures.addCanvas('shock_ring', canvas);
+    
+    canvas = document.createElement('canvas');
+    canvas.width = 300; canvas.height = 128;
+    ctx = canvas.getContext('2d');
+    const grad = ctx.createLinearGradient(0, 0, 300, 0);
+    grad.addColorStop(0, 'rgba(255,247,214,0)');
+    grad.addColorStop(0.1, 'rgba(255,247,214,0)');
+    grad.addColorStop(0.45, 'rgba(255,209,102,0.55)');
+    grad.addColorStop(0.55, 'rgba(255,122,61,0.55)');
+    grad.addColorStop(0.9, 'rgba(255,247,214,0)');
+    grad.addColorStop(1, 'rgba(255,247,214,0)');
+    ctx.fillStyle = grad;
+    ctx.filter = 'blur(6px)';
+    ctx.fillRect(0, 0, 300, 128);
+    this.textures.addCanvas('row_sweep', canvas);
+    
+    canvas = document.createElement('canvas');
+    canvas.width = 512; canvas.height = 512;
+    ctx = canvas.getContext('2d');
+    const radGrad = ctx.createRadialGradient(256, 256, 0, 256, 256, 256);
+    radGrad.addColorStop(0, 'rgba(255,209,102,0.16)');
+    radGrad.addColorStop(1, 'rgba(255,209,102,0)');
+    ctx.fillStyle = radGrad;
+    ctx.fillRect(0, 0, 512, 512);
+    this.textures.addCanvas('screen_flash', canvas);
+  }
 
-  // Spawn Lightning
-  spawnLightning(pos1.x, pos1.y, pos2.x, pos2.y);
+  roundRect(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+  }
 
-  const deltaX1 = pos2.x - pos1.x;
-  const deltaY1 = pos2.y - pos1.y;
-  const deltaX2 = pos1.x - pos2.x;
-  const deltaY2 = pos1.y - pos2.y;
+  create() {
+    gameScene = this;
+    this.tileSize = 0; 
+    this.gap = 5;
+    this.pieces = {}; 
+    this.selected = null;
+    this.fxGroup = this.add.group();
+    
+    this.particles = this.add.particles(0, 0, 'flare', {
+      speed: { min: 80, max: 200 },
+      angle: { min: 200, max: 340 },
+      scale: { start: 0.6, end: 0 },
+      blendMode: 'ADD',
+      lifespan: 600,
+      tint: [0xffd166, 0xff7a3d, 0xff3d3d, 0xfff2b8],
+      gravityY: 150,
+      emitting: false
+    });
+    
+    this.boardGroup = this.add.group();
+    this.drawBoard();
+    this.input.on('pointerdown', this.handleInput, this);
+    window.addEventListener('resize', () => this.scaleBoard());
+    this.scaleBoard();
+  }
 
-  // Strip any classes that carry their own transform/animation (selected bob,
-  // reachable pulse, hover lift) so they can't fight the inline transform below.
-  el1.classList.remove('selected', 'reachable', 'playable');
-  el2.classList.remove('selected', 'reachable', 'playable');
+  drawBoard() {
+    this.boardGroup.clear(true, true);
+    for(let r=0; r<ROWS; r++) {
+      for(let c=0; c<COLS; c++) {
+        let texKey = isWall(r,c) ? 'piece_wall' : (grid[r][c] === 6 ? 'piece_6' : 'piece_7');
+        let sprite = this.add.sprite(0, 0, texKey);
+        
+        let container = this.add.container(0, 0, [sprite]);
+        container.setData('r', r); 
+        container.setData('c', c); 
+        container.setData('val', grid[r][c]);
+        
+        if(!isWall(r,c)) {
+          let pieceVal = grid[r][c];
+          let txtColor = pieceVal === 6 ? '#eafcff' : '#fff0f9';
+          let glowColor = pieceVal === 6 ? '#4fe3ff' : '#ff62c4';
+          
+          let txt = this.add.text(0, 0, pieceVal.toString(), {
+            fontSize: '48px',
+            fontFamily: 'Arial',
+            color: txtColor,
+            fontStyle: 'bold'
+          }).setOrigin(0.5);
+          
+          txt.setShadow(0, 2, 'rgba(0,0,0,0.5)', 4, true, true);
+          container.add(txt);
+        }
+        
+        container.setSize(100, 100);
+        container.setInteractive(new Phaser.Geom.Rectangle(-50, -50, 100, 100), Phaser.Geom.Rectangle.Contains);
+        
+        this.boardGroup.add(container);
+        this.pieces[`${r},${c}`] = container;
+      }
+    }
+  }
 
-  el1.classList.add('animating');
-  el2.classList.add('animating');
+  scaleBoard() {
+    const cont = document.getElementById('phaser-container');
+    const w = cont.clientWidth - 28;
+    if (w <= 0) return;
+    
+    this.gap = Math.max(3, Math.floor(w / 100));
+    this.tileSize = (w - (COLS + 1) * this.gap) / COLS;
+    const boardW = COLS * this.tileSize + (COLS + 1) * this.gap;
+    const offsetX = (w - boardW) / 2 + this.gap + this.tileSize/2;
+    const offsetY = 14 + this.tileSize/2;
 
-  // Force a layout flush before assigning the transform so the transition
-  // reliably picks up the starting state (prevents an occasional snap/skip).
-  void el1.offsetWidth;
+    this.boardGroup.children.iterate((cont) => {
+      let r = cont.getData('r'), c = cont.getData('c');
+      let x = offsetX + c * (this.tileSize + this.gap);
+      let y = offsetY + r * (this.tileSize + this.gap);
+      
+      cont.setPosition(x, y);
+      cont.setScale(this.tileSize / 100);
+    });
+  }
 
-  el1.style.transform = `translate(${deltaX1}px, ${deltaY1}px)`;
-  el2.style.transform = `translate(${deltaX2}px, ${deltaY2}px)`;
+  handleInput(pointer) {
+    let clicked = null;
+    this.boardGroup.children.iterate((cont) => {
+      let bounds = cont.getBounds();
+      if(bounds.contains(pointer.x, pointer.y)) clicked = cont;
+    });
 
-  setTimeout(() => {
-    el1.style.transform = '';
-    el2.style.transform = '';
-    el1.classList.remove('animating');
-    el2.classList.remove('animating');
-    if (callback) callback();
-  }, 350);
-}
+    if(!clicked) { this.deselect(); return; }
+    let r = clicked.getData('r'), c = clicked.getData('c');
+    if(isWall(r,c) || locked[r][c]) return;
 
-function doSwap(r1, c1, r2, c2) {
-  if (gameover || swapInProgress) return;
-  swapInProgress = true;
-
-  const board = document.getElementById('board');
-  const idx1 = r1 * COLS + c1;
-  const idx2 = r2 * COLS + c2;
-  const el1 = board.children[idx1];
-  const el2 = board.children[idx2];
-
-  pushHistory();
-
-  animateSwap(el1, el2, () => {
-    const tmp = grid[r1][c1];
-    grid[r1][c1] = grid[r2][c2];
-    grid[r2][c2] = tmp;
-    moves++;
-    swapInProgress = false;
-    if (typeof tutOnSwap === 'function') tutOnSwap();
-
-    if (moveLimit > 0 && moves >= moveLimit && !checkWin()) {
-      renderGame();
-      triggerGameover(`🚫 Move limit of ${moveLimit} reached!`);
+    if(!this.selected) {
+      this.select(clicked);
     } else {
-      renderGame();
+      let sr = this.selected.getData('r'), sc = this.selected.getData('c');
+      if(sr === r && sc === c) { this.deselect(); }
+      else {
+        let isValid = getKnightMoves(sr, sc).some(([mr, mc]) => mr === r && mc === c);
+        if(isValid) this.swapPieces(this.selected, clicked);
+        else this.select(clicked);
+      }
     }
-  });
-}
-
-function doUndo() {
-  if (history.length === 0) return;
-  const snap = history.pop();
-  grid = snap.grid;
-  locked = snap.locked;
-  visits = snap.visits;
-  moves = snap.moves;
-  selected = null; reachable = [];
-  renderGame();
-}
-
-function calcProgress() {
-  let six=0, seven=0, lockedCount=0, sixTotal=0, sevenTotal=0;
-  for (let r=0; r<ROWS; r++) for (let c=0; c<COLS; c++) {
-    if (isWall(r,c)) continue;
-    if (goalValue(r)===6) sixTotal++; else sevenTotal++;
-    if (isCorrect(r, c, grid[r][c])) { if (goalValue(r)===6) six++; else seven++; }
-    if (locked[r][c]) lockedCount++;
   }
-  return { six, seven, lockedCount, sixTotal, sevenTotal };
-}
 
-function checkWin() {
-  for (let r=0; r<ROWS; r++)
-    for (let c=0; c<COLS; c++)
-      if (!isWall(r,c) && !isCorrect(r, c, grid[r][c])) return false;
-  return true;
-}
+  select(piece) {
+    this.deselect();
+    this.selected = piece;
+    
+    this.tweens.add({ 
+      targets: piece, 
+      y: piece.y - (this.tileSize * 0.08), 
+      duration: 150, 
+      ease: 'Back.easeOut' 
+    });
+    
+    let glow = this.add.sprite(piece.x, piece.y, 'glow_select')
+      .setScale(this.tileSize / 100)
+      .setDepth(5);
+    piece.setData('glow', glow);
+    
+    this.tweens.add({ 
+      targets: glow, 
+      alpha: { from: 1, to: 0.6 }, 
+      scale: this.tileSize / 95,
+      duration: 700, 
+      yoyo: true, 
+      repeat: -1 
+    });
 
-function isRowComplete(r) {
-  for (let c=0; c<COLS; c++)
-    if (!isWall(r,c) && !isCorrect(r, c, grid[r][c])) return false;
-  return true;
-}
-
-// ── ROW LOCKED celebration: a flame wave sweeps left→right across the row,
-// igniting each cell with a shockwave ring + screen flash, then settles
-// into a warm ember drift. ──
-let fireParticles = [];
-let fireRunning = false;
-let fireAnimId = null;
-const fireCanvas = document.getElementById('fire-canvas');
-const fireCtx = fireCanvas.getContext('2d');
-
-function sizeFireCanvas() {
-  fireCanvas.width = window.innerWidth;
-  fireCanvas.height = window.innerHeight;
-}
-sizeFireCanvas();
-window.addEventListener('resize', sizeFireCanvas);
-
-const FIRE_COLORS = ['#ffd166', '#ff7a3d', '#ff3d3d', '#fff2b8'];
-
-// Pre-rendered particle sprites. Creating a CanvasGradient object is
-// surprisingly expensive, and the old code did it for every particle on
-// every single animation frame (100+ particles x ~60 frames during a row
-// completion). Instead we bake the gradient into a tiny offscreen canvas
-// once, and each frame just stamps it with drawImage (a cheap GPU blit)
-// scaled/faded per particle.
-function makeParticleSprite(color) {
-  const size = 48;
-  const c = document.createElement('canvas');
-  c.width = size; c.height = size;
-  const sctx = c.getContext('2d');
-  const grad = sctx.createRadialGradient(size/2, size/2, 0, size/2, size/2, size/2);
-  grad.addColorStop(0, '#fff7d6');
-  grad.addColorStop(0.35, color);
-  grad.addColorStop(1, 'rgba(255,61,61,0)');
-  sctx.fillStyle = grad;
-  sctx.beginPath();
-  sctx.arc(size/2, size/2, size/2, 0, Math.PI * 2);
-  sctx.fill();
-  return c;
-}
-const FIRE_SPRITES = FIRE_COLORS.map(makeParticleSprite);
-const EMBER_SPRITE = makeParticleSprite('#fff2b8');
-
-function spawnShockRing(cx, cy) {
-  const ring = document.createElement('div');
-  ring.className = 'shock-ring';
-  ring.style.left = cx + 'px';
-  ring.style.top = cy + 'px';
-  document.body.appendChild(ring);
-  setTimeout(() => ring.remove(), 600);
-}
-
-function triggerRowFire(rowIndex) {
-  const board = document.getElementById('board');
-  const firstCellIdx = rowIndex * COLS;
-
-  const cells = [];
-  for (let c = 0; c < COLS; c++) {
-    const el = board.children[firstCellIdx + c];
-    if (el) cells.push(el);
-  }
-  if (!cells.length) return;
-
-  const playableCells = cells.filter(el => !el.classList.contains('wall'));
-  if (!playableCells.length) return;
-
-  const firstRect = cells[0].getBoundingClientRect();
-  const lastRect = cells[cells.length - 1].getBoundingClientRect();
-  const midX = (firstRect.left + lastRect.right) / 2;
-  const topY = firstRect.top;
-  const rowWidth = lastRect.right - firstRect.left;
-
-  // Full-row sweeping flame band that travels across the row once.
-  const STEP = 36; // ms between each cell igniting — gives the sweep its speed
-  const sweepDuration = STEP * (cells.length - 1) + 350;
-
-  const sweep = document.createElement('div');
-  sweep.className = 'row-sweep';
-  sweep.style.setProperty('--sweep-dist', rowWidth + 'px');
-  sweep.style.setProperty('--sweep-dur', sweepDuration + 'ms');
-  // Position the sweep band relative to the row's fx layer
-  const fxLayer = document.getElementById('row-fx-layer');
-  const layerRect = fxLayer.getBoundingClientRect();
-  sweep.style.position = 'absolute';
-  sweep.style.left = (firstRect.left - layerRect.left) + 'px';
-  sweep.style.top = (firstRect.top - layerRect.top) + 'px';
-  sweep.style.height = firstRect.height + 'px';
-  fxLayer.appendChild(sweep);
-  setTimeout(() => sweep.remove(), sweepDuration + 50);
-
-  // Screen-wide warm flash anchored near the row, gentle (not overpowering)
-  const flash = document.createElement('div');
-  flash.className = 'lock-flash-screen';
-  flash.style.setProperty('--flash-x', midX + 'px');
-  flash.style.setProperty('--flash-y', topY + 'px');
-  document.body.appendChild(flash);
-  setTimeout(() => flash.remove(), 650);
-
-  // Banner — appears once the sweep has had time to reach mid-row
-  setTimeout(() => {
-    const banner = document.createElement('div');
-    banner.className = 'row-banner';
-    banner.textContent = '🔥 Row Locked!';
-    banner.style.left = midX + 'px';
-    banner.style.top = (topY - 8) + 'px';
-    document.body.appendChild(banner);
-    setTimeout(() => banner.remove(), 1350);
-  }, STEP * Math.floor(cells.length / 2));
-
-  // Precompute every cell's position ONCE, up front. The old code called
-  // getBoundingClientRect() again inside each staggered setTimeout, which
-  // forces a synchronous layout recalculation each time — doing it all in
-  // one batch here avoids that repeated layout thrashing.
-  const cellRects = cells.map(el => el.getBoundingClientRect());
-
-  // Stagger the ignition wave cell-by-cell, left to right.
-  cells.forEach((el, i) => {
-    const delay = i * STEP;
-    setTimeout(() => {
-      if (!el.classList.contains('wall')) {
-        el.classList.remove('ignite');
-        // Restart the animation cleanly (in case it's re-triggered) using
-        // a rAF instead of `void el.offsetWidth` — that old approach forces
-        // a synchronous full-document layout on every cell; rAF just waits
-        // for the next paint, which is effectively free by comparison.
-        requestAnimationFrame(() => {
-          el.classList.add('ignite');
-          el.classList.add('row-complete-glow');
-          setTimeout(() => el.classList.remove('ignite'), 560);
+    let r = piece.getData('r'), c = piece.getData('c');
+    getKnightMoves(r, c).forEach(([mr, mc]) => {
+      let target = this.pieces[`${mr},${mc}`];
+      if(target && !isWall(mr,mc) && !locked[mr][mc]) {
+        let reach = this.add.sprite(target.x, target.y, 'glow_reach')
+          .setScale(this.tileSize / 100)
+          .setAlpha(0.7)
+          .setDepth(4);
+        target.setData('reach', reach);
+        this.tweens.add({ 
+          targets: reach, 
+          alpha: { from: 0.7, to: 0.3 },
+          scale: this.tileSize / 95,
+          duration: 650, 
+          yoyo: true, 
+          repeat: -1 
         });
       }
-      const rect = cellRects[i];
-      const cx = rect.left + rect.width / 2;
-      const cy = rect.top + rect.height / 2;
-      spawnShockRing(cx, cy);
-      if (!el.classList.contains('wall')) spawnFireBurst(cx, cy);
-    }, delay);
-  });
-
-  // Light screen shake, timed to the peak of the sweep
-  setTimeout(() => {
-    const shakeTarget = document.getElementById('shake-target');
-    shakeTarget.classList.remove('shake');
-    requestAnimationFrame(() => {
-      shakeTarget.classList.add('shake');
-      setTimeout(() => shakeTarget.classList.remove('shake'), 420);
-    });
-  }, STEP * Math.floor(cells.length / 2));
-
-  if (!fireRunning) { fireRunning = true; fireLoop(); }
-}
-
-function spawnFireBurst(cx, cy) {
-  const count = IS_TOUCH ? 6 : 16;
-  for (let i = 0; i < count; i++) {
-    const angle = (Math.PI * 2 * i) / count + (Math.random()*0.4-0.2);
-    const speed = 1.6 + Math.random() * 3.4;
-    fireParticles.push({
-      x: cx, y: cy,
-      vx: Math.cos(angle) * speed,
-      vy: Math.sin(angle) * speed - 1.8,
-      size: 4 + Math.random() * 6.5,
-      life: 1,
-      decay: 0.016 + Math.random() * 0.018,
-      sprite: FIRE_SPRITES[Math.floor(Math.random()*FIRE_SPRITES.length)],
-      grav: 0.05 + Math.random()*0.04,
-      flicker: Math.random() * Math.PI * 2
     });
   }
-  // rising embers that drift and flicker on the way up
-  const emberCount = IS_TOUCH ? 2 : 8;
-  for (let i = 0; i < emberCount; i++) {
-    fireParticles.push({
-      x: cx + (Math.random()*22-11), y: cy,
-      vx: (Math.random()-0.5)*0.7,
-      vy: -1.6 - Math.random()*1.8,
-      size: 2 + Math.random()*3,
-      life: 1,
-      decay: 0.009 + Math.random()*0.01,
-      sprite: EMBER_SPRITE,
-      grav: -0.012,
-      flicker: Math.random() * Math.PI * 2
-    });
-  }
-}
 
-function fireLoop() {
-  if (!fireRunning) return;
-  fireCtx.clearRect(0, 0, fireCanvas.width, fireCanvas.height);
-  let alive = false;
-  for (const p of fireParticles) {
-    if (p.life <= 0) continue;
-    p.x += p.vx;
-    p.y += p.vy;
-    p.vy += p.grav;
-    p.vx *= 0.97;
-    p.life -= p.decay;
-    p.flicker += 0.4;
-    if (p.life > 0) {
-      alive = true;
-      const flicker = 0.82 + Math.sin(p.flicker) * 0.18;
-      // drawImage of a pre-rendered sprite instead of building a fresh
-      // CanvasGradient every particle every frame — this is the change
-      // that makes the row-completion celebration smooth on mobile.
-      fireCtx.globalAlpha = Math.max(0, p.life) * flicker;
-      const r = p.size * Math.max(0.2, p.life) * flicker;
-      fireCtx.drawImage(p.sprite, p.x - r, p.y - r, r * 2, r * 2);
-    }
-  }
-  fireCtx.globalAlpha = 1;
-  fireParticles = fireParticles.filter(p => p.life > 0);
-  if (alive || fireParticles.length) {
-    fireAnimId = requestAnimationFrame(fireLoop);
-  } else {
-    fireRunning = false;
-    fireCtx.clearRect(0, 0, fireCanvas.width, fireCanvas.height);
-  }
-}
-
-function detectNewlyCompletedRows() {
-  const newlyDone = [];
-  for (let r = 0; r < ROWS; r++) {
-    const done = isRowComplete(r);
-    if (done && !rowsCompletedBefore.has(r)) {
-      newlyDone.push(r);
-      rowsCompletedBefore.add(r);
-    } else if (!done && rowsCompletedBefore.has(r)) {
-      rowsCompletedBefore.delete(r);
-    }
-  }
-  return newlyDone;
-}
-
-// The board's cell count (ROWS*COLS) never changes during the app's
-// lifetime, so we build the 112 cell elements + 14 row labels exactly
-// once and reuse them forever after. Every subsequent render only
-// touches className/textContent/style on cells that actually changed,
-// and clicks are handled by a single delegated listener instead of 112
-// per-cell closures. Rebuilding the whole board on every tap (the old
-// approach) was the main source of jank/lag, especially on Android.
-let boardCellsBuilt = false;
-
-function buildBoardOnce() {
-  const board = document.getElementById('board');
-  board.innerHTML = '';
-  const frag = document.createDocumentFragment();
-  for (let r = 0; r < ROWS; r++) {
-    for (let c = 0; c < COLS; c++) {
-      const cell = document.createElement('div');
-      cell.className = 'cell';
-      cell.dataset.r = r;
-      cell.dataset.c = c;
-      frag.appendChild(cell);
-    }
-  }
-  board.appendChild(frag);
-
-  const labels = document.getElementById('row-labels');
-  labels.innerHTML = '';
-  const labelFrag = document.createDocumentFragment();
-  for (let r = 0; r < ROWS; r++) {
-    const lbl = document.createElement('div');
-    lbl.textContent = goalValue(r) === 6 ? '6→' : '7→';
-    labelFrag.appendChild(lbl);
-  }
-  labels.appendChild(labelFrag);
-
-  boardCellsBuilt = true;
-}
-
-// Single delegated click listener — attached once, handles all 112 cells.
-document.getElementById('board').addEventListener('click', (e) => {
-  const cellEl = e.target.closest('.cell');
-  if (!cellEl || cellEl.parentElement.id !== 'board') return;
-  handleGameClick(Number(cellEl.dataset.r), Number(cellEl.dataset.c));
-});
-
-function renderGame() {
-  const board = document.getElementById('board');
-  if (!boardCellsBuilt) buildBoardOnce();
-
-  const reachSet = new Set(reachable.map(([r,c]) => r*COLS+c));
-
-  for (let r = 0; r < ROWS; r++) {
-    for (let c = 0; c < COLS; c++) {
-      const idx = r * COLS + c;
-      const cell = board.children[idx];
-
-      if (isWall(r,c)) {
-        if (cell.className !== 'cell wall') cell.className = 'cell wall';
-        if (cell.textContent !== '▪') cell.textContent = '▪';
-        if (cell.style.boxShadow) cell.style.boxShadow = '';
-        continue;
-      }
-
-      const val = grid[r][c];
-      const isLocked = locked[r][c];
-      const isSel = selected && selected[0]===r && selected[1]===c;
-      const isReach = reachSet.has(idx);
-      const rowDone = isRowComplete(r);
-
-      let cls = 'cell ' + (val===6 ? 'six' : 'seven');
-      if (isLocked) {
-        cls += ' locked';
-      } else {
-        cls += ' playable';
-        if (lockThreshold === 2 && visits[r][c] >= 1 && isCorrect(r, c, val)) {
-          cls += ' warming';
-        }
-        if (isSel)   cls += ' selected';
-        if (isReach) cls += ' reachable';
-      }
-      // Only touch the DOM when something actually changed — this is what
-      // keeps taps cheap even though we loop over all 112 cells each time.
-      if (cell.className !== cls) cell.className = cls;
-
-      const bs = rowDone
-        ? (isLocked ? 'inset 0 0 0 1.5px var(--lock-purple)' : (isSel ? '' : '0 0 0 1.5px rgba(200,126,255,0.5), 0 0 10px rgba(200,126,255,0.25)'))
-        : '';
-      if (cell.style.boxShadow !== bs) cell.style.boxShadow = bs;
-
-      const txt = String(val);
-      if (cell.textContent !== txt) cell.textContent = txt;
-    }
-  }
-
-  const labels = document.getElementById('row-labels');
-  for (let r = 0; r < ROWS; r++) {
-    const lbl = labels.children[r];
-    const cls = 'row-label' + (isRowComplete(r) ? ' correct-row' : '');
-    if (lbl.className !== cls) lbl.className = cls;
-  }
-
-  const movesText = moveLimit > 0 ? `${moves} / ${moveLimit}` : `${moves}`;
-  document.getElementById('mc').textContent = movesText;
-  updateTimerDisplay();
-  const p = calcProgress();
-  const totalPlayable = ROWS * COLS - walls.size;
-  document.getElementById('total-cells').textContent = totalPlayable;
-  
-  const sixPct    = p.sixTotal   > 0 ? Math.round(p.six   / p.sixTotal   * 100) : 0;
-  const sevenPct  = p.sevenTotal > 0 ? Math.round(p.seven / p.sevenTotal * 100) : 0;
-  const lockedPct = Math.round(p.lockedCount / totalPlayable * 100);
-  document.getElementById('lc').textContent = p.lockedCount;
-  document.getElementById('prog-six-fill').style.width    = sixPct + '%';
-  document.getElementById('prog-six-val').textContent     = sixPct + '%';
-  document.getElementById('prog-seven-fill').style.width  = sevenPct + '%';
-  document.getElementById('prog-seven-val').textContent   = sevenPct + '%';
-  document.getElementById('prog-locked-fill').style.width = lockedPct + '%';
-  document.getElementById('prog-locked-val').textContent  = lockedPct + '%';
-
-  const statusEl = document.getElementById('status');
-  if (selected) {
-    const [sr,sc] = selected;
-    statusEl.textContent = `${grid[sr][sc]} at (${sr},${sc}) selected — ${reachable.length} valid swap${reachable.length!==1?'s':''} available.`;
-    statusEl.className = 'active';
-  } else {
-    statusEl.textContent = 'Select a piece to move it via a knight jump.';
-    statusEl.className = '';
-  }
-
-  // Detect newly-completed rows AFTER DOM is in place, then fire effect
-  const newlyDone = detectNewlyCompletedRows();
-  if (newlyDone.length) {
-    newlyDone.forEach(r => triggerRowFire(r));
-  }
-
-  if (checkWin() && !winShown) {
-    winShown = true;
-    setTimeout(showWin, 400);
-  }
-}
-
-function handleGameClick(r, c) {
-  if (gameover || winShown || swapInProgress) return;
-  if (isWall(r,c)) return;
-  if (typeof tutHandleClick === 'function' && !tutHandleClick(r, c)) return;
-
-  if (selected) {
-    const [sr,sc] = selected;
-    if (sr===r && sc===c) { selected=null; reachable=[]; renderGame(); return; }
-
-    const reachSet = new Set(reachable.map(([a,b])=>a*COLS+b));
-    if (reachSet.has(r*COLS+c)) {
-      doSwap(sr, sc, r, c);
-      selected=null; reachable=[];
-    } else {
-      selected=[r,c];
-      reachable=knightMoves(r,c);
-      renderGame();
-    }
-  } else {
-    selected=[r,c];
-    reachable=knightMoves(r,c);
-    renderGame();
-  }
-}
-
-function showWin() {
-  stopTimer();
-  const level = LEVELS[currentLevelIndex];
-  const prog = levelProgress[currentLevelIndex];
-  const isFirstClear = !prog.completed;
-  prog.completed = true;
-  if (prog.bestMoves === null || moves < prog.bestMoves) prog.bestMoves = moves;
-
-  document.getElementById('win-mc').textContent = moves;
-  document.getElementById('win-time').textContent = formatTime(timeElapsed);
-
-  const hasNext = level.infinite || currentLevelIndex < LEVELS.length - 1;
-  const nextBtn = document.getElementById('win-reset-btn');
-  const title = document.getElementById('win-title');
-  const sub = document.getElementById('win-sub');
-  const levelLabel = level.label;
-
-  title.textContent = isFirstClear ? `${levelLabel} Clear!` : `${levelLabel} Clear Again!`;
-  if (level.infinite) {
-    sub.innerHTML = `All rows locked in.<br>Want another random puzzle?`;
-    nextBtn.textContent = 'New Puzzle →';
-  } else if (hasNext) {
-    sub.innerHTML = `All rows locked in.<br>Ready for ${LEVELS[currentLevelIndex+1].label}?`;
-    nextBtn.textContent = 'Next Level →';
-  } else {
-    sub.innerHTML = `All rows locked in.<br>You\u2019ve cleared every level!`;
-    nextBtn.textContent = 'Replay';
-  }
-
-  const overlay = document.getElementById('win-overlay');
-  overlay.classList.add('show');
-  const stars = overlay.querySelectorAll('.star');
-  stars.forEach(s => { const cl = s.cloneNode(true); s.replaceWith(cl); });
-  startConfetti();
-}
-
-document.getElementById('win-close-btn').addEventListener('click', () => {
-  document.getElementById('win-overlay').classList.remove('show'); stopConfetti();
-  showLevelSelect();
-});
-document.getElementById('win-reset-btn').addEventListener('click', () => {
-  document.getElementById('win-overlay').classList.remove('show'); stopConfetti();
-  const level = LEVELS[currentLevelIndex];
-  if (!level.infinite && currentLevelIndex < LEVELS.length - 1) currentLevelIndex++;
-  initGame(true);
-});
-document.getElementById('reset-btn').addEventListener('click', () => initGame(false));
-document.getElementById('levels-back-btn').addEventListener('click', () => {
-  stopTimer();
-  showLevelSelect();
-});
-
-// Confetti
-const canvas = document.getElementById('confetti-canvas');
-const ctx = canvas.getContext('2d');
-let confettiPieces=[], confettiRunning=false, animId=null;
-const COLORS=['#4fe3ff','#ff62c4','#ffd166','#ff7a3d','#c87eff','#6fa8ff'];
-
-function startConfetti() {
-  confettiRunning=true;
-  canvas.width=window.innerWidth; canvas.height=window.innerHeight;
-  confettiPieces=Array.from({length: IS_TOUCH ? 70 : 150},()=>({
-    x:Math.random()*canvas.width, y:Math.random()*-canvas.height*0.5,
-    w:6+Math.random()*8, h:10+Math.random()*9,
-    color:COLORS[Math.floor(Math.random()*COLORS.length)],
-    vy:2+Math.random()*3, vx:(Math.random()-0.5)*2,
-    rot:Math.random()*360, rotSpeed:(Math.random()-0.5)*5,
-    opacity:0.85+Math.random()*0.15,
-  }));
-  if(animId)cancelAnimationFrame(animId);
-  animLoop();
-}
-function animLoop() {
-  if(!confettiRunning)return;
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-  let alive=false;
-  for(const p of confettiPieces){
-    p.y+=p.vy; p.x+=p.vx; p.rot+=p.rotSpeed; p.vy+=0.04;
-    if(p.y<canvas.height+20)alive=true;
-    ctx.save(); ctx.globalAlpha=p.opacity;
-    ctx.translate(p.x,p.y); ctx.rotate(p.rot*Math.PI/180);
-    ctx.shadowColor = p.color; ctx.shadowBlur = 6;
-    ctx.fillStyle=p.color; ctx.fillRect(-p.w/2,-p.h/2,p.w,p.h);
-    ctx.restore();
-  }
-  if(alive)animId=requestAnimationFrame(animLoop); else stopConfetti();
-}
-function stopConfetti(){
-  confettiRunning=false;
-  if(animId){cancelAnimationFrame(animId);animId=null;}
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-}
-window.addEventListener('resize',()=>{ if(confettiRunning){canvas.width=window.innerWidth;canvas.height=window.innerHeight;}});
-
-
-
-document.getElementById('go-close-btn').addEventListener('click', () => {
-  document.getElementById('gameover-overlay').classList.remove('show');
-});
-document.getElementById('go-retry-btn').addEventListener('click', () => {
-  document.getElementById('gameover-overlay').classList.remove('show');
-  initGame(false);
-});
-
-
-// ═══════════════════════════════════════════
-//  BOARD FIT — computes --cell / --gap / --label-w live so the whole
-//  8x14 board is always fully visible on screen (both width AND height),
-//  on any device. Row labels share the same --gap / --cell vars as the
-//  board grid, so they always line up with their row exactly.
-// ═══════════════════════════════════════════
-function fitBoard() {
-  const panelGame = document.getElementById('panel-game');
-  if (!panelGame.classList.contains('active')) return;
-
-  const isNarrow = window.innerWidth <= 700;
-  const gap = isNarrow ? 3 : 5;
-  const boardPad = isNarrow ? 8 : 14;
-  const labelW = isNarrow ? 20 : 30;
-  const labelGap = isNarrow ? 4 : 8;
-
-  document.documentElement.style.setProperty('--gap', gap + 'px');
-  document.documentElement.style.setProperty('--board-pad', boardPad + 'px');
-  document.documentElement.style.setProperty('--label-w', labelW + 'px');
-  document.documentElement.style.setProperty('--label-gap', labelGap + 'px');
-
-  const boardSection = document.getElementById('board-section');
-  const sectionRect = boardSection.getBoundingClientRect();
-
-  const vw = window.innerWidth;
-  const vh = window.innerHeight;
-
-  // How much vertical room is left below the top of the board section,
-  // minus a little breathing room at the bottom.
-  const bottomMargin = isNarrow ? 12 : 24;
-  const availHeight = vh - sectionRect.top - bottomMargin;
-
-  // How much horizontal room the board itself has (side panel, on wide
-  // layouts, sits next to it and is NOT part of this width).
-  const availWidth = sectionRect.width || (vw - 32);
-
-  const maxCellFromWidth  = (availWidth - labelW - labelGap - boardPad*2 - gap*7) / 8;
-  const maxCellFromHeight = (availHeight - boardPad*2 - gap*13) / 14;
-
-  let cell = Math.floor(Math.min(maxCellFromWidth, maxCellFromHeight));
-  cell = Math.max(16, Math.min(cell, 48));
-
-  document.documentElement.style.setProperty('--cell', cell + 'px');
-}
-window.addEventListener('resize', rafThrottle(fitBoard));
-
-
-// ═══════════════════════════════════════════
-//  TUTORIAL ENGINE
-// ═══════════════════════════════════════════
-let tutActive = false;
-let tutStep = 0;
-let tutTargetPiece = null;
-let tutWaitingFor = null;  // 'select' | 'swap' | null
-let tutSpotlightRings = [];
-let tutTapHints = [];
-
-const TUT_STEPS = 5;
-
-const tutOverlay = document.getElementById('tut-overlay');
-const tutCanvas  = document.getElementById('tut-canvas');
-const tutCtx     = tutCanvas.getContext('2d');
-const tutCard    = document.getElementById('tut-card');
-const tutDots    = document.getElementById('tut-step-dots');
-const tutIconEl  = document.getElementById('tut-icon');
-const tutTitle   = document.getElementById('tut-title');
-const tutBody    = document.getElementById('tut-body');
-const tutNextBtn = document.getElementById('tut-next');
-const tutSkipBtn = document.getElementById('tut-skip');
-
-function sizeTutCanvas() {
-  tutCanvas.width  = window.innerWidth;
-  tutCanvas.height = window.innerHeight;
-}
-window.addEventListener('resize', rafThrottle(() => { sizeTutCanvas(); tutRedraw(); }));
-
-function tutRedraw() {
-  if (!tutActive) return;
-  // re-run the current step visuals
-  tutShowStep(tutStep);
-}
-
-function tutDrawDark(holes) {
-  sizeTutCanvas();
-  tutCtx.clearRect(0, 0, tutCanvas.width, tutCanvas.height);
-  tutCtx.fillStyle = 'rgba(4,6,16,0.84)';
-  if (!holes || !holes.length) {
-    tutCtx.fillRect(0, 0, tutCanvas.width, tutCanvas.height);
-    return;
-  }
-  tutCtx.save();
-  tutCtx.beginPath();
-  tutCtx.rect(0, 0, tutCanvas.width, tutCanvas.height);
-  for (const {x, y, w, h, r: rad} of holes) {
-    const r = rad || 12;
-    tutCtx.moveTo(x + r, y);
-    tutCtx.lineTo(x + w - r, y);
-    tutCtx.arcTo(x+w, y,   x+w, y+h, r);
-    tutCtx.lineTo(x+w, y+h-r);
-    tutCtx.arcTo(x+w, y+h, x,   y+h, r);
-    tutCtx.lineTo(x+r,   y+h);
-    tutCtx.arcTo(x,   y+h, x,   y,   r);
-    tutCtx.lineTo(x,   y+r);
-    tutCtx.arcTo(x,   y,   x+w, y,   r);
-    tutCtx.closePath();
-  }
-  tutCtx.clip('evenodd');
-  tutCtx.fillRect(0, 0, tutCanvas.width, tutCanvas.height);
-  tutCtx.restore();
-}
-
-function tutClearRings() {
-  tutSpotlightRings.forEach(el => el.remove());
-  tutSpotlightRings = [];
-  tutTapHints.forEach(el => el.remove());
-  tutTapHints = [];
-}
-
-function tutCellRect(r, c) {
-  const board = document.getElementById('board');
-  const el = board.children[r * COLS + c];
-  return el ? el.getBoundingClientRect() : null;
-}
-
-function tutRowRect(row) {
-  let minL=Infinity, minT=Infinity, maxR=-Infinity, maxB=-Infinity;
-  const board = document.getElementById('board');
-  for (let c = 0; c < COLS; c++) {
-    if (isWall(row, c)) continue;
-    const el = board.children[row * COLS + c];
-    if (!el) continue;
-    const rect = el.getBoundingClientRect();
-    minL = Math.min(minL, rect.left); minT = Math.min(minT, rect.top);
-    maxR = Math.max(maxR, rect.right); maxB = Math.max(maxB, rect.bottom);
-  }
-  return { left:minL, top:minT, right:maxR, bottom:maxB, width:maxR-minL, height:maxB-minT };
-}
-
-function tutAddRing(rect, color, extraPad) {
-  const pad = extraPad || 6;
-  const el = document.createElement('div');
-  el.className = 'tut-spotlight-ring';
-  el.style.cssText = `left:${rect.left - pad}px; top:${rect.top - pad}px; width:${rect.width + pad*2}px; height:${rect.height + pad*2}px;`;
-  if (color) { el.style.borderColor = color; el.style.boxShadow = `0 0 0 3px ${color}33, 0 0 24px 4px ${color}66`; }
-  document.body.appendChild(el);
-  tutSpotlightRings.push(el);
-}
-
-function tutAddTapHint(rect) {
-  const el = document.createElement('div');
-  el.className = 'tap-hint-ring';
-  el.style.left = (rect.left + rect.width  / 2) + 'px';
-  el.style.top  = (rect.top  + rect.height / 2) + 'px';
-  document.body.appendChild(el);
-  tutTapHints.push(el);
-}
-
-function tutPositionCard(anchorRect, prefer) {
-  const cw = tutCard.offsetWidth || 296;
-  const gap = 18;
-  const vw = window.innerWidth, vh = window.innerHeight;
-  const ch = tutCard.offsetHeight || 240;
-  let top, left;
-  prefer = prefer || 'right';
-
-  const canRight  = anchorRect.right  + gap + cw  < vw;
-  const canLeft   = anchorRect.left   - gap - cw  > 0;
-  const canBottom = anchorRect.bottom + gap + ch  < vh;
-  const canTop    = anchorRect.top    - gap - ch  > 0;
-
-  if (prefer === 'right'  && canRight)  { left = anchorRect.right  + gap; top = anchorRect.top + anchorRect.height/2 - ch/2; }
-  else if (prefer === 'left' && canLeft) { left = anchorRect.left   - gap - cw; top = anchorRect.top + anchorRect.height/2 - ch/2; }
-  else if (canBottom)                    { top  = anchorRect.bottom + gap; left = anchorRect.left + anchorRect.width/2 - cw/2; }
-  else if (canTop)                       { top  = anchorRect.top    - gap - ch; left = anchorRect.left + anchorRect.width/2 - cw/2; }
-  else if (canRight)                     { left = anchorRect.right  + gap; top = anchorRect.top + anchorRect.height/2 - ch/2; }
-  else                                   { left = anchorRect.left   - gap - cw; top = anchorRect.top + anchorRect.height/2 - ch/2; }
-
-  top  = Math.max(12, Math.min(vh - ch - 12, top));
-  left = Math.max(12, Math.min(vw - cw - 12, left));
-  tutCard.style.top  = top  + 'px';
-  tutCard.style.left = left + 'px';
-}
-
-function tutSetDots(current) {
-  tutDots.innerHTML = '';
-  for (let i = 0; i < TUT_STEPS; i++) {
-    const d = document.createElement('div');
-    d.className = 'tut-dot' + (i < current ? ' done' : i === current ? ' active' : '');
-    tutDots.appendChild(d);
-  }
-}
-
-function tutShowStep(step) {
-  tutStep = step;
-  tutClearRings();
-  tutNextBtn.disabled = false;
-  tutNextBtn.textContent = step === TUT_STEPS - 1 ? 'Play! →' : 'Got it →';
-  tutSetDots(step);
-  // Only step 3 (case 2) uses the compact smaller card
-  tutCard.classList.toggle('compact', step === 2);
-
-  const tp = tutTargetPiece; // [r,c] of our teaching piece
-
-  switch (step) {
-
-    case 0: { // ── The goal ─────────────────────────────────────────────
-      tutIconEl.textContent = '👀';
-      tutTitle.textContent = 'The goal';
-      tutBody.innerHTML =
-        `Each row must contain <strong>only 6s</strong> or <strong>only 7s</strong> — alternating down the board.<br><br>` +
-        `<span class="cyan">Even rows (0, 2, 4…)</span> need all <span class="cyan">6s</span>.<br>` +
-        `<span class="pink">Odd rows (1, 3, 5…)</span> need all <span class="pink">7s</span>.<br><br>` +
-        `Right now they're all mixed up. Your job is to sort them!`;
-
-      const r0 = tutRowRect(0), r1 = tutRowRect(1);
-      tutDrawDark([
-        { x:r0.left-8, y:r0.top-8, w:r0.width+16, h:r0.height+16, r:14 },
-        { x:r1.left-8, y:r1.top-8, w:r1.width+16, h:r1.height+16, r:14 },
-      ]);
-      tutAddRing(r0, 'var(--six-text)',   8);
-      tutAddRing(r1, 'var(--seven-text)', 8);
-      tutPositionCard({ left:r0.left, top:r0.top, width:r0.width, height:r1.bottom-r0.top, right:r0.right, bottom:r1.bottom }, 'right');
-      break;
-    }
-
-    case 1: { // ── Select a piece ────────────────────────────────────────
-      tutIconEl.textContent = '☝️';
-      tutTitle.textContent = 'Select a piece';
-      tutBody.innerHTML =
-        `Tap a piece to select it.<br><br>` +
-        `The <span class="pink">7</span> highlighted below is in an even row — it doesn't belong there. Tap it!`;
-
-      tutNextBtn.disabled = true;
-      tutWaitingFor = 'select';
-
-      if (tp) {
-        const rect = tutCellRect(tp[0], tp[1]);
-        if (rect) {
-          tutDrawDark([{ x:rect.left-10, y:rect.top-10, w:rect.width+20, h:rect.height+20, r:15 }]);
-          tutAddRing(rect, 'var(--seven-text)', 8);
-          tutAddTapHint(rect);
-          tutPositionCard(rect, window.innerWidth > 480 ? 'right' : 'bottom');
-        }
-      }
-      break;
-    }
-
-    case 2: { // ── Knight moves ─────────────────────────────────────────
-      tutIconEl.textContent = '♞';
-      tutTitle.textContent = 'Knight moves only';
-      tutBody.innerHTML =
-        `Pieces swap using a chess <strong>knight's L-shape</strong> — 2 squares in one direction, 1 to the side.<br>` +
-        `<svg class="tut-knight-diagram" width="110" height="110" viewBox="0 0 110 110" xmlns="http://www.w3.org/2000/svg">
-          <defs><style>.kg{fill:#0c1628;stroke:#2a3050;stroke-width:1.5}.kr{fill:rgba(111,168,255,0.22);stroke:#6fa8ff;stroke-width:2}</style></defs>
-          <!-- 4x4 mini grid, knight at center (col1,row1) -->
-          <rect class="kg" x="2"  y="2"  width="25" height="25" rx="4"/>
-          <rect class="kg" x="29" y="2"  width="25" height="25" rx="4"/>
-          <rect class="kg" x="56" y="2"  width="25" height="25" rx="4"/>
-          <rect class="kg" x="83" y="2"  width="25" height="25" rx="4"/>
-          <rect class="kg" x="2"  y="29" width="25" height="25" rx="4"/>
-          <rect x="29" y="29" width="25" height="25" rx="4" fill="#1e2d4a" stroke="#6fa8ff" stroke-width="2"/>
-          <text x="41" y="47" text-anchor="middle" fill="#a0c8ff" font-size="16" font-weight="800">♞</text>
-          <rect class="kg" x="56" y="29" width="25" height="25" rx="4"/>
-          <rect class="kg" x="83" y="29" width="25" height="25" rx="4"/>
-          <rect class="kg" x="2"  y="56" width="25" height="25" rx="4"/>
-          <rect class="kg" x="29" y="56" width="25" height="25" rx="4"/>
-          <rect class="kg" x="56" y="56" width="25" height="25" rx="4"/>
-          <rect class="kg" x="83" y="56" width="25" height="25" rx="4"/>
-          <rect class="kg" x="2"  y="83" width="25" height="25" rx="4"/>
-          <rect class="kg" x="29" y="83" width="25" height="25" rx="4"/>
-          <rect class="kg" x="56" y="83" width="25" height="25" rx="4"/>
-          <rect class="kg" x="83" y="83" width="25" height="25" rx="4"/>
-          <rect class="kr" x="2"  y="2"  width="25" height="25" rx="4"/>
-          <rect class="kr" x="56" y="2"  width="25" height="25" rx="4"/>
-          <rect class="kr" x="2"  y="56" width="25" height="25" rx="4"/>
-          <rect class="kr" x="56" y="56" width="25" height="25" rx="4"/>
-          <line x1="41" y1="41" x2="14" y2="14" stroke="#6fa8ff" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.6"/>
-          <line x1="41" y1="41" x2="68" y2="14" stroke="#6fa8ff" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.6"/>
-          <line x1="41" y1="41" x2="14" y2="68" stroke="#6fa8ff" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.6"/>
-          <line x1="41" y1="41" x2="68" y2="68" stroke="#6fa8ff" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.6"/>
-        </svg>` +
-        `Glowing cells show valid landing spots. Tap one to make your first swap!`;
-
-      tutNextBtn.disabled = true;
-      tutWaitingFor = 'swap';
-
-      // Spotlight the selected piece + reachable cells
-      if (tp) {
-        const selRect = tutCellRect(tp[0], tp[1]);
-        const holes = [];
-        if (selRect) holes.push({ x:selRect.left-10, y:selRect.top-10, w:selRect.width+20, h:selRect.height+20, r:14 });
-        reachable.forEach(([rr,rc]) => {
-          const rect = tutCellRect(rr, rc);
-          if (rect) holes.push({ x:rect.left-8, y:rect.top-8, w:rect.width+16, h:rect.height+16, r:13 });
-        });
-        tutDrawDark(holes);
-        if (selRect) tutAddRing(selRect, 'var(--selected-glow)', 8);
-        reachable.forEach(([rr,rc]) => {
-          const rect = tutCellRect(rr, rc);
-          if (rect) tutAddRing(rect, 'var(--accent)', 6);
-        });
-        // Step 3: compact card — snap to right side of viewport, vertically mid-board
-        const boardWrap = document.querySelector('.board-wrap');
-        const br = boardWrap ? boardWrap.getBoundingClientRect() : { top: 120, bottom: window.innerHeight - 40 };
-        const cw2 = tutCard.offsetWidth || 193;
-        const ch2 = tutCard.offsetHeight || 180;
-        tutCard.style.left = (window.innerWidth - cw2 - 12) + 'px';
-        tutCard.style.top  = Math.max(12, Math.min(window.innerHeight - ch2 - 12, br.top + (br.bottom - br.top) / 2 - ch2 / 2)) + 'px';
-      } else {
-        tutDrawDark();
-        const cw2 = tutCard.offsetWidth || 193;
-        const ch2 = tutCard.offsetHeight || 180;
-        tutCard.style.left = (window.innerWidth - cw2 - 12) + 'px';
-        tutCard.style.top  = '90px';
-      }
-      break;
-    }
-
-    case 3: { // ── Locking ───────────────────────────────────────────────
-      tutIconEl.textContent = '🔒';
-      tutTitle.textContent = 'Pieces lock in';
-      tutBody.innerHTML =
-        `When a piece lands in its <strong>correct row</strong>, it locks automatically — shown with 🔒.<br><br>` +
-        `Once an <em>entire row</em> is correct, you'll see a <strong>fire celebration</strong> and the row lights up purple.<br><br>` +
-        `Locked pieces can't be moved — keep sorting until every row is done!`;
-
-      tutWaitingFor = null;
-      tutDrawDark();
-      tutPositionCard({ left: window.innerWidth/2 - 55, top: 80, width: 110, height: 40, right:0, bottom:0 }, 'bottom');
-      break;
-    }
-
-    case 4: { // ── Go! ───────────────────────────────────────────────────
-      tutIconEl.textContent = '🚀';
-      tutTitle.textContent = "You're ready!";
-      tutBody.innerHTML =
-        `Sort all <strong>14 rows</strong> — alternating <span class="cyan">6s</span> and <span class="pink">7s</span> from top to bottom.<br><br>` +
-        `<strong>Pro tip:</strong> Look two knight-jumps ahead. Moving a piece into the right row will lock it automatically, so plan before you tap!<br><br>Good luck!`;
-
-      tutWaitingFor = null;
-      tutNextBtn.textContent = 'Play! →';
-      tutDrawDark();
-      tutPositionCard({ left: window.innerWidth/2 - 55, top: 80, width: 110, height: 40, right:0, bottom:0 }, 'bottom');
-      break;
-    }
-  }
-}
-
-// Returns true = let normal click handling run, false = block it
-function tutHandleClick(r, c) {
-  if (!tutActive) return true;
-
-  if (tutWaitingFor === 'select') {
-    const tp = tutTargetPiece;
-    if (tp && r === tp[0] && c === tp[1]) {
-      tutWaitingFor = null;
-      // Allow normal click so `selected` / `reachable` get set, then advance
-      setTimeout(() => tutShowStep(2), 120);
-      return true;
-    }
-    // Wrong tap — shake the card gently to redirect
-    tutCard.animate(
-      [{ transform:'translateX(-5px)' }, { transform:'translateX(5px)' }, { transform:'translateX(-3px)' }, { transform:'translateX(0)' }],
-      { duration: 320, easing: 'ease-out' }
-    );
-    return false;
-  }
-
-  if (tutWaitingFor === 'swap') {
-    return true; // allow; doSwap callback calls tutOnSwap
-  }
-
-  return true;
-}
-
-function tutOnSwap() {
-  if (!tutActive || tutWaitingFor !== 'swap') return;
-  tutWaitingFor = null;
-  setTimeout(() => tutShowStep(3), 420);
-}
-
-function startTutorial() {
-  // Pick a teaching piece: a 7 sitting on an even row with available moves
-  tutTargetPiece = null;
-  for (let r = 0; r < ROWS && !tutTargetPiece; r += 2) {
-    for (let c = 0; c < COLS; c++) {
-      if (!isWall(r, c) && grid[r][c] === 7 && knightMoves(r, c).length > 0) {
-        tutTargetPiece = [r, c]; break;
-      }
-    }
-  }
-  if (!tutTargetPiece) {
-    // Fallback: any misplaced piece with moves
-    outer: for (let r = 0; r < ROWS; r++) {
-      for (let c = 0; c < COLS; c++) {
-        if (!isWall(r,c) && !isCorrect(r,c,grid[r][c]) && knightMoves(r,c).length > 0) {
-          tutTargetPiece = [r, c]; break outer;
-        }
-      }
-    }
-  }
-
-  tutActive = true;
-  tutWaitingFor = null;
-  document.body.classList.add('tut-lock');
-  tutOverlay.classList.add('active');
-  sizeTutCanvas();
-  tutShowStep(0);
-}
-
-function tutEnd() {
-  tutActive = false;
-  tutWaitingFor = null;
-  tutClearRings();
-  tutOverlay.classList.remove('active');
-  tutCtx.clearRect(0, 0, tutCanvas.width, tutCanvas.height);
-  document.body.classList.remove('tut-lock');
-  document.body.style.overflow = '';
-}
-
-tutNextBtn.addEventListener('click', () => {
-  if (tutStep < TUT_STEPS - 1) tutShowStep(tutStep + 1);
-  else tutEnd();
-});
-tutSkipBtn.addEventListener('click', tutEnd);
-
-// ── LEVEL SELECT ──
-function renderLevelSelect() {
-  const grid = document.getElementById('level-grid');
-  grid.innerHTML = '';
-  LEVELS.forEach((level, i) => {
-    const prog = levelProgress[i];
-    const prevCompleted = i === 0 || levelProgress[i-1].completed;
-    const locked = level.infinite ? false : !prevCompleted;
-
-    const card = document.createElement('button');
-    card.className = 'level-card' + (locked ? ' locked' : '') + (prog.completed ? ' completed' : '') + (level.infinite ? ' infinite-card' : '');
-    card.disabled = locked;
-
-    const wallNote = level.infinite ? 'Random each time' : (level.walls === 0 ? 'No walls' : `${level.walls} walls`);
-    const lockNote = level.infinite ? 'Single or double' : (level.threshold === 2 ? 'Double-lock' : 'Single-lock');
-
-    card.innerHTML = `
-      <div class="level-card-icon">${locked ? '🔒' : level.icon}</div>
-      <div class="level-card-label">${level.label}</div>
-      <div class="level-card-sub">${locked ? 'Complete previous level' : level.subtitle}</div>
-      ${!locked ? `<div class="level-card-meta">${wallNote} · ${lockNote}</div>` : ''}
-      ${(prog.completed && !level.infinite) ? `<div class="level-card-best">✓ Best: ${prog.bestMoves} moves</div>` : ''}
-    `;
-
-    if (!locked) {
-      card.addEventListener('click', () => {
-        currentLevelIndex = i;
-        showGame(true);
+  deselect() {
+    if(this.selected) {
+      this.tweens.add({ 
+        targets: this.selected, 
+        y: this.selected.y + (this.tileSize * 0.08), 
+        duration: 150 
       });
+      if(this.selected.getData('glow')) {
+        this.selected.getData('glow').destroy();
+        this.selected.setData('glow', null);
+      }
     }
-    grid.appendChild(card);
+    this.selected = null;
+    
+    this.boardGroup.children.iterate(c => {
+      if(c.getData('reach')) {
+        c.getData('reach').destroy();
+        c.setData('reach', null);
+      }
+    });
+  }
+
+  swapPieces(p1, p2) {
+    let r1 = p1.getData('r'), c1 = p1.getData('c');
+    let r2 = p2.getData('r'), c2 = p2.getData('c');
+    this.deselect();
+
+    this.tweens.add({ 
+      targets: p1, 
+      x: p2.x, 
+      y: p2.y, 
+      duration: 350, 
+      ease: 'Cubic.easeInOut' 
+    });
+    this.tweens.add({
+      targets: p2, 
+      x: p1.x, 
+      y: p1.y, 
+      duration: 350, 
+      ease: 'Cubic.easeInOut',
+      onComplete: () => {
+        [grid[r1][c1], grid[r2][c2]] = [grid[r2][c2], grid[r1][c1]];
+        
+        p1.setData('r', r2); 
+        p1.setData('c', c2); 
+        p1.setData('val', grid[r2][c2]);
+        p2.setData('r', r1); 
+        p2.setData('c', c1); 
+        p2.setData('val', grid[r1][c1]);
+        
+        this.pieces[`${r2},${c2}`] = p1; 
+        this.pieces[`${r1},${c1}`] = p2;
+
+        moves++; 
+        document.getElementById('mc').innerText = moves;
+        
+        this.checkNewlyCompletedRows();
+      }
+    });
+  }
+
+  checkNewlyCompletedRows() {
+    let newlyCompleted = [];
+    
+    for(let r=0; r<ROWS; r++) {
+      let isComplete = true;
+      for(let c=0; c<COLS; c++) {
+        if(!isWall(r,c) && !isCorrect(r, c, grid[r][c])) {
+          isComplete = false;
+          break;
+        }
+      }
+      
+      if(isComplete && !rowsCompletedBefore.has(r)) {
+        newlyCompleted.push(r);
+        rowsCompletedBefore.add(r);
+      } else if(!isComplete && rowsCompletedBefore.has(r)) {
+        rowsCompletedBefore.delete(r);
+      }
+    }
+    
+    newlyCompleted.forEach(r => this.triggerRowFireFX(r));
+    
+    let lockCount = 0;
+    for(let r=0; r<ROWS; r++) {
+      for(let c=0; c<COLS; c++) {
+        if(locked[r][c]) lockCount++;
+      }
+    }
+    document.getElementById('lc').innerText = lockCount;
+    
+    if(newlyCompleted.length > 0) {
+      setTimeout(() => this.checkWin(), 1000);
+    }
+  }
+
+  triggerRowFireFX(rowIndex) {
+    const firstCell = this.pieces[`${rowIndex},0`];
+    const lastCell = this.pieces[`${rowIndex},${COLS-1}`];
+    if(!firstCell || !lastCell) return;
+    
+    const midX = (firstCell.x + lastCell.x) / 2;
+    const rowY = firstCell.y;
+    
+    this.cameras.main.shake(400, 0.015);
+    
+    let flash = this.add.sprite(this.scale.width/2, this.scale.height/2, 'screen_flash')
+      .setAlpha(0)
+      .setDepth(100);
+    flash.setDisplaySize(this.scale.width * 2, this.scale.height * 2);
+    this.tweens.add({ 
+      targets: flash, 
+      alpha: { from: 0, to: 1, back: 0 }, 
+      duration: 100, 
+      yoyo: true, 
+      hold: 100,
+      onComplete: () => flash.destroy()
+    });
+    
+    let sweep = this.add.sprite(firstCell.x - 100, rowY, 'row_sweep')
+      .setDepth(50)
+      .setAlpha(0.8);
+    sweep.setDisplaySize(200, this.tileSize);
+    this.tweens.add({ 
+      targets: sweep, 
+      x: lastCell.x + 200, 
+      duration: 650, 
+      ease: 'Linear',
+      onComplete: () => sweep.destroy()
+    });
+    
+    const cells = [];
+    for(let c=0; c<COLS; c++) {
+      if(!isWall(rowIndex, c)) {
+        cells.push(this.pieces[`${rowIndex},${c}`]);
+      }
+    }
+    
+    cells.forEach((cell, i) => {
+      this.time.delayedCall(i * 36, () => {
+        this.tweens.add({
+          targets: cell,
+          scaleX: cell.scaleX * 1.25,
+          scaleY: cell.scaleY * 1.25,
+          duration: 200,
+          ease: 'Back.easeOut',
+          yoyo: true
+        });
+        
+        let ring = this.add.sprite(cell.x, cell.y, 'shock_ring')
+          .setScale(0.2)
+          .setAlpha(1)
+          .setDepth(60);
+        this.tweens.add({ 
+          targets: ring, 
+          scale: 2.5, 
+          alpha: 0, 
+          duration: 550, 
+          ease: 'Cubic.easeOut', 
+          onComplete: () => ring.destroy() 
+        });
+        
+        this.particles.emitParticleAt(cell.x, cell.y + 10, 12);
+      });
+    });
+    
+    const bannerBg = this.add.graphics().setDepth(110);
+    bannerBg.fillStyle(0xff7a3d, 1);
+    bannerBg.fillRoundedRect(-90, -22, 180, 44, 22);
+    const bannerTxt = this.add.text(0, 0, '🔥 Row Locked!', { 
+      fontSize: '20px', 
+      color: '#2a1300', 
+      fontStyle: 'bold' 
+    }).setOrigin(0.5).setDepth(111);
+    const banner = this.add.container(midX, rowY - 50, [bannerBg, bannerTxt])
+      .setDepth(110)
+      .setScale(0);
+    
+    this.tweens.add({
+      targets: banner, 
+      scale: 1.15, 
+      duration: 220, 
+      ease: 'Back.easeOut',
+      yoyo: true, 
+      hold: 900,
+      onComplete: () => banner.destroy()
+    });
+  }
+
+  checkWin() {
+    let allCorrect = true;
+    for(let r=0; r<ROWS; r++) {
+      for(let c=0; c<COLS; c++) {
+        if(!isWall(r,c) && !isCorrect(r, c, grid[r][c])) {
+          allCorrect = false;
+          break;
+        }
+      }
+    }
+    
+    if(allCorrect) {
+      document.getElementById('win-mc').innerText = moves;
+      document.getElementById('win-overlay').classList.add('show');
+    }
+  }
+}
+
+// ═══════════════════════════════════════════
+//  INITIALIZATION
+// ═══════════════════════════════════════════
+const config = {
+  type: Phaser.AUTO,
+  parent: 'phaser-container',
+  width: 800, 
+  height: 1200,
+  backgroundColor: '#0d1120',
+  scene: MainScene,
+  scale: { 
+    mode: Phaser.Scale.FIT, 
+    autoCenter: Phaser.Scale.CENTER_HORIZONTALLY 
+  },
+  fps: { target: 60 }
+};
+
+function renderLevelSelect() {
+  const gridEl = document.getElementById('level-grid');
+  gridEl.innerHTML = '';
+  LEVELS.forEach((lvl, i) => {
+    let btn = document.createElement('button');
+    btn.className = 'level-card';
+    btn.innerHTML = `
+      <div class="level-card-icon">${lvl.icon}</div>
+      <div class="level-card-label">${lvl.label}</div>
+      <div class="level-card-sub">${lvl.subtitle}</div>
+    `;
+    btn.onclick = () => startGame(i);
+    gridEl.appendChild(btn);
   });
 }
 
-function showLevelSelect() {
-  stopTimer();
-  document.body.classList.remove('in-game');
-  document.getElementById('panel-levels').classList.add('active');
-  document.getElementById('panel-game').classList.remove('active');
-  renderLevelSelect();
-}
-
-function showGame(regenerate) {
-  document.body.classList.add('in-game');
+function startGame(idx) {
+  currentLevelIndex = idx;
+  generateLevel(LEVELS[idx].walls);
+  moves = 0;
+  document.getElementById('mc').innerText = '0';
+  document.getElementById('lc').innerText = '0';
+  document.getElementById('total-cells').innerText = (ROWS * COLS - walls.size);
+  
   document.getElementById('panel-levels').classList.remove('active');
   document.getElementById('panel-game').classList.add('active');
-  initGame(regenerate);
+  
+  setTimeout(() => {
+    if (!game) {
+      game = new Phaser.Game(config);
+    } else {
+      gameScene.scene.restart();
+    }
+  }, 50);
 }
 
-function updateLevelHeader() {
-  const level = LEVELS[currentLevelIndex];
-  document.getElementById('level-header-icon').textContent = level.icon;
-  document.getElementById('level-header-label').textContent = level.label;
+function closeWin() {
+  document.getElementById('win-overlay').classList.remove('show');
+  document.getElementById('panel-game').classList.remove('active');
+  document.getElementById('panel-levels').classList.add('active');
 }
+
+document.getElementById('reset-btn').onclick = () => startGame(currentLevelIndex);
+document.getElementById('levels-back-btn').onclick = () => {
+  document.getElementById('panel-game').classList.remove('active');
+  document.getElementById('panel-levels').classList.add('active');
+};
 
 renderLevelSelect();
 </script>
-
 </body>
 </html>
