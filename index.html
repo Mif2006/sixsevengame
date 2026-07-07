@@ -52,15 +52,21 @@ header p { font-size: 13px; color: #828aae; max-width: 500px; line-height: 1.5; 
 .ctrl-btn:hover { background: linear-gradient(180deg, #232b47, #1a2138); border-color: #6fa8ff; }
 .ctrl-btn:active { transform: scale(0.95); }
 
+/* FIX: Container now has max-width and lets Phaser handle the height via FIT mode */
 #phaser-container {
-  width: 100%; display: flex; justify-content: center;
-  border-radius: 22px; overflow: hidden; position: relative;
+  width: 100%; 
+  max-width: 640px;
+  display: flex; 
+  justify-content: center;
+  border-radius: 22px; 
+  overflow: hidden; 
+  position: relative;
   background: linear-gradient(160deg, #181f36 0%, #0d1120 55%, #0a0d18 100%);
   box-shadow: 0 40px 80px -20px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.04) inset;
   border: 1px solid rgba(255,255,255,0.06);
   padding: 14px;
 }
-canvas { touch-action: none; display: block; }
+canvas { touch-action: none; display: block; width: 100% !important; height: auto !important; }
 
 #win-overlay { display: none; position: fixed; inset: 0; background: radial-gradient(ellipse at 50% 35%, rgba(20,50,40,0.45), rgba(6,8,16,0.92)); backdrop-filter: blur(4px); z-index: 100; align-items: center; justify-content: center; }
 #win-overlay.show { display: flex; }
@@ -85,7 +91,7 @@ canvas { touch-action: none; display: block; }
 <body>
 
 <header>
-  <h1> Knight Swap</h1>
+  <h1>⚔ Knight Swap</h1>
   <p>Arrange rows so each is all 6s or all 7s, alternating. Swap pieces using chess knight moves.</p>
 </header>
 
@@ -105,7 +111,7 @@ canvas { touch-action: none; display: block; }
 
 <div id="win-overlay">
   <div class="win-card">
-    <span id="win-trophy"></span>
+    <span id="win-trophy">🏆</span>
     <div id="win-title">Puzzle Complete!</div>
     <div id="win-sub">All rows are correct.<br>Every piece is home.</div>
     <div id="win-badge">Solved in <span id="win-mc">0</span> moves</div>
@@ -114,7 +120,7 @@ canvas { touch-action: none; display: block; }
 </div>
 
 <script>
-// ══════════════════════════════════════════
+// ═══════════════════════════════════════════
 //  GAME LOGIC
 // ═══════════════════════════════════════════
 const ROWS = 14, COLS = 8;
@@ -365,7 +371,9 @@ class MainScene extends Phaser.Scene {
     this.boardGroup = this.add.group();
     this.drawBoard();
     this.input.on('pointerdown', this.handleInput, this);
-    window.addEventListener('resize', () => this.scaleBoard());
+    
+    // FIX: Scale board once on create. No need to listen to window resize 
+    // because internal resolution is fixed and FIT mode handles the rest.
     this.scaleBoard();
   }
 
@@ -384,7 +392,6 @@ class MainScene extends Phaser.Scene {
         if(!isWall(r,c)) {
           let pieceVal = grid[r][c];
           let txtColor = pieceVal === 6 ? '#eafcff' : '#fff0f9';
-          let glowColor = pieceVal === 6 ? '#4fe3ff' : '#ff62c4';
           
           let txt = this.add.text(0, 0, pieceVal.toString(), {
             fontSize: '48px',
@@ -406,15 +413,16 @@ class MainScene extends Phaser.Scene {
     }
   }
 
+  // FIX: Calculate positions based on INTERNAL game width, not DOM container width
   scaleBoard() {
-    const cont = document.getElementById('phaser-container');
-    const w = cont.clientWidth - 28;
+    const internalWidth = this.sys.game.config.width;
+    const w = internalWidth - 28; // Account for padding
     if (w <= 0) return;
     
-    this.gap = Math.max(3, Math.floor(w / 100));
+    this.gap = 5;
     this.tileSize = (w - (COLS + 1) * this.gap) / COLS;
     const boardW = COLS * this.tileSize + (COLS + 1) * this.gap;
-    const offsetX = (w - boardW) / 2 + this.gap + this.tileSize/2;
+    const offsetX = (internalWidth - boardW) / 2 + this.tileSize/2;
     const offsetY = 14 + this.tileSize/2;
 
     this.boardGroup.children.iterate((cont) => {
@@ -711,12 +719,12 @@ const config = {
   type: Phaser.AUTO,
   parent: 'phaser-container',
   width: 800, 
-  height: 1200,
+  height: 1400, // FIX: Increased height to ensure all 14 rows fit comfortably
   backgroundColor: '#0d1120',
   scene: MainScene,
   scale: { 
     mode: Phaser.Scale.FIT, 
-    autoCenter: Phaser.Scale.CENTER_HORIZONTALLY 
+    autoCenter: Phaser.Scale.CENTER_BOTH // FIX: Center both horizontally and vertically
   },
   fps: { target: 60 }
 };
