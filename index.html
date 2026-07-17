@@ -233,8 +233,24 @@ function isTutorialLevel() {
 }
 
 function computeTutorialTarget1() {
+  // A piece surrounded only by identical values would make for a comically
+  // pointless demo swap (7 swapping with another 7), so require at least one
+  // knight move to a piece with a genuinely different value.
+  const hasUsefulMove = (r, c) => getKnightMoves(r, c).some(([mr, mc]) => grid[mr][mc] !== grid[r][c]);
+
   // Prefer a misplaced piece near the top of the board so it's unlikely to be
   // covered by the bottom-anchored tutorial card.
+  for (const r of [0, 1, 2, 3]) {
+    for (let c = 0; c < COLS; c++) {
+      if (!isWall(r, c) && !isCorrect(r, c, grid[r][c]) && hasUsefulMove(r, c)) return { r, c };
+    }
+  }
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      if (!isWall(r, c) && !isCorrect(r, c, grid[r][c]) && hasUsefulMove(r, c)) return { r, c };
+    }
+  }
+  // Fallback (should be unreachable in practice): drop the "useful move" requirement.
   for (const r of [0, 1, 2, 3]) {
     for (let c = 0; c < COLS; c++) {
       if (!isWall(r, c) && !isCorrect(r, c, grid[r][c])) return { r, c };
