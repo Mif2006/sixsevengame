@@ -35,14 +35,23 @@ header p { font-size: 13px; color: #828aae; max-width: 500px; line-height: 1.5; 
 .level-card-icon { font-size: 30px; line-height: 1; }
 .level-card-label { font-size: 14px; font-weight: 800; }
 .level-card-sub { font-size: 11px; color: #828aae; text-align: center; min-height: 28px; }
+.level-card-best { font-size: 10px; color: #6de0a8; background: rgba(61,186,126,0.12); border-radius: 20px; padding: 2px 8px; margin-top: 2px; }
+.level-card-time { font-size: 10px; font-weight: 700; color: #ffb547; background: rgba(255,181,71,0.12); border: 1px solid rgba(255,181,71,0.35); border-radius: 20px; padding: 2px 8px; margin-top: 2px; }
 
 #controls { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; justify-content: center; }
 .stat-chip {
   display: flex; align-items: center; gap: 6px; background: linear-gradient(180deg, #161c30, #11151f);
   border: 1px solid #2a3050; border-radius: 10px; padding: 7px 13px; font-size: 13px; color: #828aae;
   box-shadow: 0 1px 0 rgba(255,255,255,0.04) inset, 0 4px 10px -4px rgba(0,0,0,0.5);
+  transition: border-color 0.25s, box-shadow 0.25s;
 }
 .stat-chip b, .stat-chip span { color: #eef0fb; font-weight: 700; }
+.stat-chip.timer-danger-chip { border-color: #ff5566; box-shadow: 0 0 16px rgba(255,85,102,0.5), 0 1px 0 rgba(255,255,255,0.04) inset; }
+#timer { display: inline-block; transition: color 0.25s; }
+#timer.timer-warn { color: #ffb547 !important; }
+#timer.timer-danger { color: #ff5566 !important; animation: timerPulse 0.55s ease-in-out infinite; }
+@keyframes timerPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.2); } }
+
 .ctrl-btn {
   background: linear-gradient(180deg, #1c2338, #141a2c); border: 1px solid #2a3050;
   color: #eef0fb; font-size: 13px; font-weight: 500; padding: 7px 15px; border-radius: 10px;
@@ -52,7 +61,6 @@ header p { font-size: 13px; color: #828aae; max-width: 500px; line-height: 1.5; 
 .ctrl-btn:hover { background: linear-gradient(180deg, #232b47, #1a2138); border-color: #6fa8ff; }
 .ctrl-btn:active { transform: scale(0.95); }
 
-/* FIX: Container now has max-width and lets Phaser handle the height via FIT mode */
 #phaser-container {
   width: 100%; 
   max-width: 640px;
@@ -68,6 +76,39 @@ header p { font-size: 13px; color: #828aae; max-width: 500px; line-height: 1.5; 
 }
 canvas { touch-action: none; display: block; width: 100% !important; height: auto !important; }
 
+#tutorial-overlay {
+  display: none; position: fixed; inset: 0; z-index: 100;
+  align-items: flex-end; justify-content: center; padding: 24px 16px; pointer-events: none;
+}
+#tutorial-overlay.show { display: flex; }
+.tutorial-card {
+  pointer-events: auto; width: 100%; max-width: 420px; box-sizing: border-box;
+  background: linear-gradient(160deg, #182240 0%, #0f1620 100%); border: 1px solid #6fa8ff;
+  border-radius: 22px; padding: 26px 26px 20px;
+  box-shadow: 0 24px 60px -14px rgba(0,0,0,0.75), 0 0 44px rgba(111,168,255,0.22), 0 0 0 1px rgba(111,168,255,0.1) inset;
+  color: white;
+}
+#tutorial-dots { display: flex; gap: 6px; margin-bottom: 16px; }
+#tutorial-dots .dot { width: 8px; height: 8px; border-radius: 50%; background: #2a3350; transition: background 0.2s, box-shadow 0.2s; }
+#tutorial-dots .dot.active { background: #ffd166; box-shadow: 0 0 10px rgba(255,209,102,0.85); }
+#tutorial-dots .dot.done { background: #6fa8ff; }
+#tutorial-icon { font-size: 40px; display: block; margin-bottom: 10px; }
+#tutorial-title { font-size: 22px; font-weight: 800; margin-bottom: 8px; color: #ffffff; }
+#tutorial-text { font-size: 14px; line-height: 1.6; color: #b9c3ec; margin-bottom: 22px; }
+#tutorial-text b { color: #ffd166; }
+.tutorial-card-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+#tutorial-skip-link {
+  background: none; border: none; color: #6b7396; font-size: 12.5px; font-weight: 700;
+  cursor: pointer; font-family: inherit; padding: 8px 4px; transition: color 0.15s;
+}
+#tutorial-skip-link:hover { color: #9aa3cc; }
+#tutorial-action-btn {
+  background: linear-gradient(180deg, #6fa8ff, #3d78d9); border: 1px solid #4a8eff; color: #04122b;
+  font-weight: 800; font-size: 13.5px; padding: 11px 22px; border-radius: 14px; cursor: pointer;
+  font-family: inherit; white-space: nowrap; transition: transform 0.1s;
+}
+#tutorial-action-btn:active { transform: scale(0.96); }
+
 #win-overlay { display: none; position: fixed; inset: 0; background: radial-gradient(ellipse at 50% 35%, rgba(20,50,40,0.45), rgba(6,8,16,0.92)); backdrop-filter: blur(4px); z-index: 100; align-items: center; justify-content: center; }
 #win-overlay.show { display: flex; }
 .win-card {
@@ -78,13 +119,32 @@ canvas { touch-action: none; display: block; width: 100% !important; height: aut
 #win-trophy { font-size: 58px; margin-bottom: 12px; display: block; }
 #win-title { font-size: 27px; font-weight: 800; margin-bottom: 6px; background: linear-gradient(180deg, #fff, #b9f3cf); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
 #win-sub { font-size: 13px; color: #828aae; margin-bottom: 24px; line-height: 1.5; }
-#win-badge { display: inline-block; background: linear-gradient(160deg,#1c3a2c,#142a20); border: 1px solid #3dba7e; border-radius: 40px; padding: 10px 26px; font-size: 14px; font-weight: 700; color: #ff62c4; margin-bottom: 30px; }
+#win-badge { display: inline-block; background: linear-gradient(160deg,#1c3a2c,#142a20); border: 1px solid #3dba7e; border-radius: 40px; padding: 10px 26px; font-size: 14px; font-weight: 700; color: #ff62c4; margin-bottom: 10px; }
+#win-best-time { font-size: 12px; color: #6de0a8; margin-bottom: 20px; }
+
+#lose-overlay { display: none; position: fixed; inset: 0; background: radial-gradient(ellipse at 50% 35%, rgba(60,20,20,0.45), rgba(6,8,16,0.92)); backdrop-filter: blur(4px); z-index: 100; align-items: center; justify-content: center; }
+#lose-overlay.show { display: flex; }
+.lose-card {
+  background: linear-gradient(160deg, #241616 0%, #160f0f 100%); border: 1px solid #ff5566;
+  border-radius: 22px; padding: 46px 54px; text-align: center; max-width: 400px; width: 90%;
+  box-shadow: 0 0 80px rgba(255,85,102,0.25); color: white;
+}
+#lose-icon { font-size: 58px; margin-bottom: 12px; display: block; animation: timerPulse 1s ease-in-out infinite; }
+#lose-title { font-size: 27px; font-weight: 800; margin-bottom: 6px; background: linear-gradient(180deg, #fff, #ffc7cc); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+#lose-sub { font-size: 13px; color: #828aae; margin-bottom: 24px; line-height: 1.5; }
+#lose-overlay .ctrl-btn { margin: 0 5px; }
 
 @media (max-width: 700px) {
   #level-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
   .level-card { padding: 16px 10px 14px; }
   .level-card-icon { font-size: 24px; }
   .level-card-label { font-size: 13px; }
+  .tutorial-card { padding: 20px 20px 16px; border-radius: 18px; }
+  #tutorial-icon { font-size: 32px; }
+  #tutorial-title { font-size: 19px; }
+  #tutorial-text { font-size: 13px; }
+  #tutorial-action-btn { font-size: 12px; padding: 10px 18px; }
+  .win-card, .lose-card { padding: 36px 26px; }
 }
 </style>
 </head>
@@ -102,6 +162,7 @@ canvas { touch-action: none; display: block; width: 100% !important; height: aut
 <div id="panel-game" class="panel">
   <div id="controls">
     <div class="stat-chip">Moves: <span id="mc">0</span></div>
+    <div class="stat-chip">Time: <span id="timer">0s</span></div>
     <div class="stat-chip">Locked: <span id="lc">0</span>/<span id="total-cells">112</span></div>
     <button class="ctrl-btn" id="reset-btn">↺ Reset</button>
     <button class="ctrl-btn" id="levels-back-btn">← Levels</button>
@@ -109,53 +170,320 @@ canvas { touch-action: none; display: block; width: 100% !important; height: aut
   <div id="phaser-container"></div>
 </div>
 
+<div id="tutorial-overlay">
+  <div class="tutorial-card">
+    <div id="tutorial-dots"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+    <span id="tutorial-icon">♞</span>
+    <div id="tutorial-title"></div>
+    <div id="tutorial-text"></div>
+    <div class="tutorial-card-footer">
+      <button id="tutorial-skip-link">Skip tutorial</button>
+      <button id="tutorial-action-btn">Let's play →</button>
+    </div>
+  </div>
+</div>
+
 <div id="win-overlay">
   <div class="win-card">
     <span id="win-trophy">🏆</span>
     <div id="win-title">Puzzle Complete!</div>
     <div id="win-sub">All rows are correct.<br>Every piece is home.</div>
-    <div id="win-badge">Solved in <span id="win-mc">0</span> moves</div>
-    <button class="ctrl-btn" style="background: linear-gradient(180deg, #4ed491, #2c9d68); border-color: #3dba7e; color: #06150d; font-weight:800; padding: 10px 24px;" onclick="closeWin()">Continue</button>
+    <div id="win-badge">Solved in <span id="win-mc">0</span> moves · <span id="win-time">0s</span></div>
+    <div id="win-best-time">Best Time: <span id="win-best">--</span></div>
+    <div style="display:flex; justify-content:center; gap:8px;">
+      <button class="ctrl-btn" id="win-again-btn" style="display:none; background: linear-gradient(180deg, #6fa8ff, #3d78d9); border-color: #4a8eff; color: #04122b; font-weight:800; padding: 10px 20px;">🔄 New Puzzle</button>
+      <button class="ctrl-btn" style="background: linear-gradient(180deg, #4ed491, #2c9d68); border-color: #3dba7e; color: #06150d; font-weight:800; padding: 10px 24px;" onclick="closeWin()">Continue</button>
+    </div>
+  </div>
+</div>
+
+<div id="lose-overlay">
+  <div class="lose-card">
+    <span id="lose-icon">⏱</span>
+    <div id="lose-title">Time's Up!</div>
+    <div id="lose-sub">The clock beat you this time.<br>Give it another shot.</div>
+    <button class="ctrl-btn" id="lose-retry-btn" style="background: linear-gradient(180deg, #ff8080, #d94a56); border-color: #ff5566; color: #200608; font-weight:800; padding: 10px 20px;">↺ Retry</button>
+    <button class="ctrl-btn" id="lose-back-btn">← Levels</button>
   </div>
 </div>
 
 <script>
-// ═══════════════════════════════════════════
-//  GAME LOGIC
-// ═══════════════════════════════════════════
 const ROWS = 14, COLS = 8;
-let currentLevelIndex = 0, grid = [], walls = new Set(), locked = [], moves = 0;
+let currentLevelIndex = 0, grid = [], walls = new Set(), voidCells = new Set(), locked = [], moves = 0;
 let game, gameScene;
 let rowsCompletedBefore = new Set();
+let gameOver = false;
+
+// Timer & Best Time State
+let timerInterval = null;
+let startTime = 0;
+let elapsedTime = 0;
+let bestTimes = JSON.parse(localStorage.getItem('knightSwapBestTimes') || '{}');
+
+// --- Interactive Tutorial State ---
+// tutorialStep: 0 = inactive, 'intro' = welcome card, 1-4 = guided steps.
+// tutorialTarget1 is found dynamically from the real (shuffled) board each
+// time the tutorial starts, so the copy and highlight always match what the
+// player is actually looking at.
+let tutorialStep = 0;
+let tutorialTarget1 = null;
+
+function isTutorialLevel() {
+  return !!(LEVELS[currentLevelIndex] && LEVELS[currentLevelIndex].tutorial);
+}
+
+function computeTutorialTarget1() {
+  // Prefer a misplaced piece near the top of the board so it's unlikely to be
+  // covered by the bottom-anchored tutorial card.
+  for (const r of [0, 1, 2, 3]) {
+    for (let c = 0; c < COLS; c++) {
+      if (!isWall(r, c) && !isCorrect(r, c, grid[r][c])) return { r, c };
+    }
+  }
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      if (!isWall(r, c) && !isCorrect(r, c, grid[r][c])) return { r, c };
+    }
+  }
+  return { r: 0, c: 0 };
+}
+
+function tutorialStepContent(step) {
+  if (step === 'intro') {
+    return {
+      icon: '♞', title: 'Welcome to Knight Swap!',
+      html: `Every row wants to be all one number — even rows want all <b>6</b>s, odd rows want all <b>7</b>s.<br><br>Swap two pieces at a time using a chess knight\u2019s move (an L-shape) to sort the whole board.<br><br>Let\u2019s walk through your first move.`,
+      action: "Let's play →"
+    };
+  }
+  if (step === 1) {
+    let detail = '';
+    if (tutorialTarget1) {
+      const val = grid[tutorialTarget1.r][tutorialTarget1.c];
+      const want = goalValue(tutorialTarget1.r);
+      const parity = tutorialTarget1.r % 2 === 0 ? 'even' : 'odd';
+      detail = ` The <b>${val}</b> glowing on the board is sitting in an ${parity} row, and ${parity} rows want all <b>${want}</b>s — so it doesn\u2019t belong there yet.`;
+    }
+    return { icon: '👆', title: 'Select a piece', html: `Tap the glowing piece to select it.${detail}`, action: 'Got it →' };
+  }
+  if (step === 2) {
+    return {
+      icon: '✨', title: 'Make the swap',
+      html: `Those other glowing tiles are every spot a knight could jump to from here. Tap one to swap places with your selected piece.`,
+      action: 'Got it →'
+    };
+  }
+  if (step === 3) {
+    return {
+      icon: '🎯', title: 'The rule',
+      html: `Even rows want all <b>6</b>s, odd rows want all <b>7</b>s. A row locks in with a solid purple glow once every tile matches.`,
+      action: 'Got it →'
+    };
+  }
+  if (step === 4) {
+    return {
+      icon: '🚀', title: "You're ready!",
+      html: `Keep swapping until every row locks in. Good luck out there!`,
+      action: 'Start Playing ▶'
+    };
+  }
+  return null;
+}
+
+function updateTutorialUI() {
+  const overlay = document.getElementById('tutorial-overlay');
+  if (tutorialStep === 0) { overlay.classList.remove('show'); return; }
+
+  const content = tutorialStepContent(tutorialStep);
+  if (!content) { overlay.classList.remove('show'); return; }
+
+  document.getElementById('tutorial-icon').innerText = content.icon;
+  document.getElementById('tutorial-title').innerText = content.title;
+  document.getElementById('tutorial-text').innerHTML = content.html;
+  document.getElementById('tutorial-action-btn').innerText = content.action;
+
+  const activeIdx = tutorialStep === 'intro' ? 0 : tutorialStep;
+  const dots = document.querySelectorAll('#tutorial-dots .dot');
+  dots.forEach((d, i) => {
+    d.classList.toggle('active', i === activeIdx);
+    d.classList.toggle('done', i < activeIdx);
+  });
+  overlay.classList.add('show');
+}
+
+function tutorialPrimaryClick() {
+  if (tutorialStep === 'intro') {
+    tutorialStep = 1;
+    updateTutorialUI();
+    if (gameScene) gameScene.refreshTutorialVisuals();
+    return;
+  }
+  if (tutorialStep === 4) { endTutorial(); return; }
+  advanceTutorial();
+}
+
+function advanceTutorial() {
+  if (tutorialStep === 0 || tutorialStep === 'intro') return;
+  tutorialStep++;
+  if (tutorialStep > 4) { endTutorial(); return; }
+  updateTutorialUI();
+  if (gameScene) gameScene.refreshTutorialVisuals();
+}
+
+function endTutorial() {
+  tutorialStep = 0;
+  updateTutorialUI();
+  if (gameScene) gameScene.refreshTutorialVisuals();
+}
 
 const LEVELS = [
-  { id: 0, label: 'Tutorial', subtitle: 'Learn the moves', walls: 0, icon: '🎓' },
+  { id: 0, label: 'Tutorial', subtitle: 'Learn the moves', walls: 0, icon: '🎓', tutorial: true },
   { id: 1, label: 'Level 1', subtitle: 'Warming up', walls: 10, icon: '①' },
   { id: 2, label: 'Level 2', subtitle: 'Getting tighter', walls: 16, icon: '②' },
   { id: 3, label: 'Level 3', subtitle: 'Mind the gaps', walls: 21, icon: '③' },
   { id: 4, label: 'Level 4', subtitle: 'Double-lock unlocked', walls: 26, icon: '④' },
   { id: 5, label: 'Level 5', subtitle: 'The gauntlet', walls: 30, icon: '⑤' },
+  { id: 6, label: 'Level 6', subtitle: 'Beat the clock', walls: 24, icon: '⏱', timeLimit: 90 },
+  { id: 7, label: 'Level 7', subtitle: 'No time to think', walls: 30, icon: '⚡', timeLimit: 70 },
+  { id: 8, label: 'The Tunnel', subtitle: 'Down, across, down again', tunnel: true, icon: '🌀', timeLimit: 150 },
+  { id: 9, label: 'Endless', subtitle: 'A brand-new puzzle every time', endless: true, wallsMin: 14, wallsMax: 32, icon: '♾️' },
 ];
 
 const wallKey = (r, c) => r + ',' + c;
 const isWall = (r, c) => walls.has(wallKey(r, c));
 const goalValue = (r) => r % 2 === 0 ? 6 : 7;
 const isCorrect = (r, c, val) => !isWall(r,c) && val === goalValue(r);
+const rowHasCells = (r) => { for(let c=0; c<COLS; c++) if(!isWall(r,c)) return true; return false; };
 
-function generateLevel(wallCount) {
+function formatTime(seconds) {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return m > 0 ? `${m}:${s.toString().padStart(2, '0')}` : `${s}s`;
+}
+
+function startTimer() {
+  stopTimer();
+  startTime = Date.now();
+  elapsedTime = 0;
+  const timerEl = document.getElementById('timer');
+  const chipEl = timerEl.closest('.stat-chip');
+  timerEl.classList.remove('timer-warn', 'timer-danger');
+  if (chipEl) chipEl.classList.remove('timer-danger-chip');
+  const lvl = LEVELS[currentLevelIndex];
+  timerEl.innerText = lvl.timeLimit ? formatTime(lvl.timeLimit) : '0s';
+
+  timerInterval = setInterval(() => {
+    elapsedTime = Math.floor((Date.now() - startTime) / 1000);
+    if (lvl.timeLimit) {
+      const remaining = lvl.timeLimit - elapsedTime;
+      if (remaining <= 0) {
+        timerEl.innerText = '0s';
+        stopTimer();
+        triggerTimeUp();
+        return;
+      }
+      timerEl.innerText = formatTime(remaining);
+      const ratio = remaining / lvl.timeLimit;
+      timerEl.classList.toggle('timer-warn', ratio <= 0.4 && ratio > 0.18);
+      timerEl.classList.toggle('timer-danger', ratio <= 0.18);
+      if (chipEl) chipEl.classList.toggle('timer-danger-chip', ratio <= 0.18);
+    } else {
+      document.getElementById('timer').innerText = formatTime(elapsedTime);
+    }
+  }, 1000);
+}
+
+function stopTimer() {
+  if (timerInterval) {
+    clearInterval(timerInterval);
+    timerInterval = null;
+  }
+}
+
+function triggerTimeUp() {
+  gameOver = true;
+  document.getElementById('lose-overlay').classList.add('show');
+}
+
+function getKnightMoves(r, c) {
+  const deltas = [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]];
+  return deltas.map(([dr,dc]) => [r+dr, c+dc])
+    .filter(([nr,nc]) => nr>=0 && nr<ROWS && nc>=0 && nc<COLS && !isWall(nr,nc));
+}
+
+function isBoardValid() {
+  for(let r=0; r<ROWS; r++) {
+    for(let c=0; c<COLS; c++) {
+      if(!walls.has(wallKey(r,c))) {
+        if(getKnightMoves(r, c).length === 0) return false;
+      }
+    }
+  }
+  return true;
+}
+
+function buildTunnelMask() {
+  // Carves a winding corridor: down, across, down, across (diagonal drift), down.
+  const allowed = new Set();
+  const addRect = (r0, r1, c0, c1) => {
+    for(let r=r0; r<=r1; r++) for(let c=c0; c<=c1; c++) {
+      if(r>=0 && r<ROWS && c>=0 && c<COLS) allowed.add(wallKey(r,c));
+    }
+  };
+  addRect(0, 4, 0, 3);    // straight down, left side
+  addRect(3, 5, 0, 7);    // turn - sweep across full width
+  addRect(4, 9, 5, 7);    // straight down, right side
+  addRect(7, 9, 1, 7);    // turn - sweep across (shifted)
+  addRect(8, 13, 1, 4);   // straight down, drifting toward center
+  addRect(10, 13, 4, 6);  // diagonal branch finishing to the right
+  return allowed;
+}
+
+function generateLevel(level) {
   walls.clear();
+  voidCells.clear();
   grid = Array.from({length: ROWS}, () => Array(COLS).fill(0));
   locked = Array.from({length: ROWS}, () => Array(COLS).fill(false));
   rowsCompletedBefore.clear();
-  
-  let placed = 0;
-  while(placed < wallCount) {
-    let r = Math.floor(Math.random() * ROWS), c = Math.floor(Math.random() * COLS);
-    if(!walls.has(wallKey(r,c))) { walls.add(wallKey(r,c)); placed++; }
+
+  if (level.tunnel) {
+    const allowed = buildTunnelMask();
+    for(let r=0; r<ROWS; r++) for(let c=0; c<COLS; c++) {
+      if(!allowed.has(wallKey(r,c))) walls.add(wallKey(r,c));
+    }
+    // Self-heal: seal off any cell that ended up with no valid knight move.
+    let changed = true;
+    while(changed) {
+      changed = false;
+      for(let r=0; r<ROWS; r++) for(let c=0; c<COLS; c++) {
+        if(!isWall(r,c) && getKnightMoves(r,c).length === 0) { walls.add(wallKey(r,c)); changed = true; }
+      }
+    }
+  } else {
+    // Endless mode rolls a fresh wall count within its range every time, so
+    // repeat plays genuinely feel like a new puzzle rather than the same layout.
+    const wallCount = level.endless
+      ? (level.wallsMin + Math.floor(Math.random() * (level.wallsMax - level.wallsMin + 1)))
+      : level.walls;
+    let attempts = 0, placed = 0;
+    while(placed < wallCount && attempts < 5000) {
+      attempts++;
+      let r = Math.floor(Math.random() * ROWS), c = Math.floor(Math.random() * COLS);
+      if(walls.has(wallKey(r,c))) continue;
+      walls.add(wallKey(r,c));
+      if (isBoardValid()) placed++;
+      else walls.delete(wallKey(r,c));
+    }
   }
 
+  let sixCount = 0, sevenCount = 0;
+  for(let r=0; r<ROWS; r++) for(let c=0; c<COLS; c++) if(!isWall(r,c)) {
+    if(goalValue(r) === 6) sixCount++; else sevenCount++;
+  }
+  
   let pieces = [];
-  for(let r=0; r<ROWS; r++) for(let c=0; c<COLS; c++) if(!isWall(r,c)) pieces.push(goalValue(r));
+  for(let i=0; i<sixCount; i++) pieces.push(6);
+  for(let i=0; i<sevenCount; i++) pieces.push(7);
   
   for (let i = pieces.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -165,7 +493,7 @@ function generateLevel(wallCount) {
   let idx = 0;
   for(let r=0; r<ROWS; r++) for(let c=0; c<COLS; c++) if(!isWall(r,c)) grid[r][c] = pieces[idx++];
 
-  for(let i=0; i<300; i++) {
+  for(let i=0; i<500; i++) {
     let r1 = Math.floor(Math.random()*ROWS), c1 = Math.floor(Math.random()*COLS);
     if(isWall(r1,c1)) continue;
     let validMoves = getKnightMoves(r1, c1);
@@ -176,15 +504,6 @@ function generateLevel(wallCount) {
   }
 }
 
-function getKnightMoves(r, c) {
-  const deltas = [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]];
-  return deltas.map(([dr,dc]) => [r+dr, c+dc])
-    .filter(([nr,nc]) => nr>=0 && nr<ROWS && nc>=0 && nc<COLS && !isWall(nr,nc));
-}
-
-// ═══════════════════════════════════════════
-//  PHASER SCENE
-// ═══════════════════════════════════════════
 class MainScene extends Phaser.Scene {
   constructor() { super('MainScene'); }
 
@@ -194,6 +513,7 @@ class MainScene extends Phaser.Scene {
     this.generateWallTexture();
     this.generateGlowTextures();
     this.generateEffectTextures();
+    this.generateCompletionFrameTexture();
     
     let gfx = this.make.graphics({x:0, y:0, add:false});
     gfx.fillStyle(0xffffff);
@@ -203,220 +523,238 @@ class MainScene extends Phaser.Scene {
   }
 
   generatePieceTexture(key, c1, c2, c3) {
-    const size = 128;
+    const size = 100;
     const canvas = document.createElement('canvas');
     canvas.width = size; canvas.height = size;
     const ctx = canvas.getContext('2d');
     
-    ctx.shadowColor = 'rgba(0,0,0,0.55)';
-    ctx.shadowBlur = 10;
-    ctx.shadowOffsetY = 6;
-    
-    const grad = ctx.createLinearGradient(0, 128, 128, 0);
-    grad.addColorStop(0, c3);
-    grad.addColorStop(0.48, c2);
-    grad.addColorStop(1, c1);
-    
-    this.roundRect(ctx, 14, 14, 100, 100, 28);
-    ctx.fillStyle = grad;
-    ctx.fill();
-    
+    ctx.shadowColor = 'rgba(0,0,0,0.55)'; ctx.shadowBlur = 8; ctx.shadowOffsetY = 5;
+    const grad = ctx.createLinearGradient(0, 100, 100, 0);
+    grad.addColorStop(0, c3); grad.addColorStop(0.48, c2); grad.addColorStop(1, c1);
+    this.roundRect(ctx, 0, 0, 100, 100, 22); ctx.fillStyle = grad; ctx.fill();
     ctx.shadowColor = 'transparent';
     
-    const radGrad = ctx.createRadialGradient(41, 36, 0, 41, 36, 45);
+    const radGrad = ctx.createRadialGradient(32, 28, 0, 32, 28, 35);
     radGrad.addColorStop(0, key === 'piece_6' ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.5)');
     radGrad.addColorStop(1, 'rgba(255,255,255,0)');
-    ctx.fillStyle = radGrad;
-    this.roundRect(ctx, 14, 14, 100, 100, 28);
-    ctx.fill();
+    ctx.fillStyle = radGrad; this.roundRect(ctx, 0, 0, 100, 100, 22); ctx.fill();
     
-    const innerGrad = ctx.createLinearGradient(64, 80, 64, 114);
-    innerGrad.addColorStop(0, 'rgba(0,0,0,0)');
-    innerGrad.addColorStop(1, 'rgba(0,0,0,0.3)');
-    ctx.fillStyle = innerGrad;
-    this.roundRect(ctx, 14, 14, 100, 100, 28);
-    ctx.fill();
+    const innerGrad = ctx.createLinearGradient(50, 65, 50, 100);
+    innerGrad.addColorStop(0, 'rgba(0,0,0,0)'); innerGrad.addColorStop(1, 'rgba(0,0,0,0.3)');
+    ctx.fillStyle = innerGrad; this.roundRect(ctx, 0, 0, 100, 100, 22); ctx.fill();
     
-    ctx.strokeStyle = c1 + '88';
-    ctx.lineWidth = 1.5;
-    this.roundRect(ctx, 14, 14, 100, 100, 28);
-    ctx.stroke();
-    
+    ctx.strokeStyle = c1 + '88'; ctx.lineWidth = 1.5;
+    this.roundRect(ctx, 0, 0, 100, 100, 22); ctx.stroke();
     this.textures.addCanvas(key, canvas);
   }
 
   generateWallTexture() {
-    const size = 128;
-    const canvas = document.createElement('canvas');
-    canvas.width = size; canvas.height = size;
-    const ctx = canvas.getContext('2d');
-    
-    const grad = ctx.createRadialGradient(64, 45, 0, 64, 64, 60);
-    grad.addColorStop(0, '#1a1e30');
-    grad.addColorStop(0.75, '#0c0e18');
-    
-    ctx.fillStyle = grad;
-    this.roundRect(ctx, 14, 14, 100, 100, 28);
-    ctx.fill();
-    
-    ctx.strokeStyle = 'rgba(255,255,255,0.03)';
-    ctx.lineWidth = 1.5;
-    this.roundRect(ctx, 14, 14, 100, 100, 28);
-    ctx.stroke();
-    
+    const size = 100; const canvas = document.createElement('canvas');
+    canvas.width = size; canvas.height = size; const ctx = canvas.getContext('2d');
+    const grad = ctx.createRadialGradient(50, 35, 0, 50, 50, 50);
+    grad.addColorStop(0, '#1a1e30'); grad.addColorStop(0.75, '#0c0e18');
+    ctx.fillStyle = grad; this.roundRect(ctx, 0, 0, 100, 100, 22); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.03)'; ctx.lineWidth = 1.5;
+    this.roundRect(ctx, 0, 0, 100, 100, 22); ctx.stroke();
     this.textures.addCanvas('piece_wall', canvas);
   }
 
   generateGlowTextures() {
-    let canvas = document.createElement('canvas');
-    canvas.width = 140; canvas.height = 140;
+    let canvas = document.createElement('canvas'); canvas.width = 100; canvas.height = 100;
     let ctx = canvas.getContext('2d');
-    ctx.shadowColor = '#7db8ff';
-    ctx.shadowBlur = 22;
-    ctx.strokeStyle = '#7db8ff';
-    ctx.lineWidth = 2.5;
-    this.roundRect(ctx, 20, 20, 100, 100, 28);
-    ctx.stroke();
+    ctx.shadowColor = '#7db8ff'; ctx.shadowBlur = 15; ctx.strokeStyle = '#7db8ff'; ctx.lineWidth = 2.5;
+    this.roundRect(ctx, 0, 0, 100, 100, 22); ctx.stroke();
     this.textures.addCanvas('glow_select', canvas);
     
-    canvas = document.createElement('canvas');
-    canvas.width = 140; canvas.height = 140;
-    ctx = canvas.getContext('2d');
-    const grad = ctx.createRadialGradient(70, 70, 30, 70, 70, 70);
-    grad.addColorStop(0, 'rgba(255,255,255,0.16)');
-    grad.addColorStop(1, 'rgba(255,255,255,0)');
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, 140, 140);
-    ctx.shadowColor = 'rgba(255,255,255,0.22)';
-    ctx.shadowBlur = 10;
-    ctx.strokeStyle = 'rgba(255,255,255,0.5)';
-    ctx.lineWidth = 1.5;
-    this.roundRect(ctx, 20, 20, 100, 100, 28);
-    ctx.stroke();
+    canvas = document.createElement('canvas'); canvas.width = 100; canvas.height = 100; ctx = canvas.getContext('2d');
+    const grad = ctx.createRadialGradient(50, 50, 20, 50, 50, 50);
+    grad.addColorStop(0, 'rgba(255,255,255,0.16)'); grad.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = grad; ctx.fillRect(0, 0, 100, 100);
+    ctx.shadowColor = 'rgba(255,255,255,0.22)'; ctx.shadowBlur = 10; ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 1.5;
+    this.roundRect(ctx, 0, 0, 100, 100, 22); ctx.stroke();
     this.textures.addCanvas('glow_reach', canvas);
   }
 
   generateEffectTextures() {
-    let canvas = document.createElement('canvas');
-    canvas.width = 100; canvas.height = 100;
-    let ctx = canvas.getContext('2d');
-    ctx.strokeStyle = '#ffd166';
-    ctx.lineWidth = 2;
-    ctx.shadowColor = 'rgba(255,209,102,0.6)';
-    ctx.shadowBlur = 12;
-    ctx.beginPath();
-    ctx.arc(50, 50, 40, 0, Math.PI * 2);
-    ctx.stroke();
+    let canvas = document.createElement('canvas'); canvas.width = 100; canvas.height = 100; let ctx = canvas.getContext('2d');
+    ctx.strokeStyle = '#ffd166'; ctx.lineWidth = 2; ctx.shadowColor = 'rgba(255,209,102,0.6)'; ctx.shadowBlur = 12;
+    ctx.beginPath(); ctx.arc(50, 50, 40, 0, Math.PI * 2); ctx.stroke();
     this.textures.addCanvas('shock_ring', canvas);
     
-    canvas = document.createElement('canvas');
-    canvas.width = 300; canvas.height = 128;
-    ctx = canvas.getContext('2d');
+    canvas = document.createElement('canvas'); canvas.width = 300; canvas.height = 128; ctx = canvas.getContext('2d');
     const grad = ctx.createLinearGradient(0, 0, 300, 0);
-    grad.addColorStop(0, 'rgba(255,247,214,0)');
-    grad.addColorStop(0.1, 'rgba(255,247,214,0)');
-    grad.addColorStop(0.45, 'rgba(255,209,102,0.55)');
-    grad.addColorStop(0.55, 'rgba(255,122,61,0.55)');
-    grad.addColorStop(0.9, 'rgba(255,247,214,0)');
-    grad.addColorStop(1, 'rgba(255,247,214,0)');
-    ctx.fillStyle = grad;
-    ctx.filter = 'blur(6px)';
-    ctx.fillRect(0, 0, 300, 128);
+    grad.addColorStop(0, 'rgba(255,247,214,0)'); grad.addColorStop(0.1, 'rgba(255,247,214,0)');
+    grad.addColorStop(0.45, 'rgba(255,209,102,0.55)'); grad.addColorStop(0.55, 'rgba(255,122,61,0.55)');
+    grad.addColorStop(0.9, 'rgba(255,247,214,0)'); grad.addColorStop(1, 'rgba(255,247,214,0)');
+    ctx.fillStyle = grad; ctx.filter = 'blur(6px)'; ctx.fillRect(0, 0, 300, 128);
     this.textures.addCanvas('row_sweep', canvas);
     
-    canvas = document.createElement('canvas');
-    canvas.width = 512; canvas.height = 512;
-    ctx = canvas.getContext('2d');
+    canvas = document.createElement('canvas'); canvas.width = 512; canvas.height = 512; ctx = canvas.getContext('2d');
     const radGrad = ctx.createRadialGradient(256, 256, 0, 256, 256, 256);
-    radGrad.addColorStop(0, 'rgba(255,209,102,0.16)');
-    radGrad.addColorStop(1, 'rgba(255,209,102,0)');
-    ctx.fillStyle = radGrad;
-    ctx.fillRect(0, 0, 512, 512);
+    radGrad.addColorStop(0, 'rgba(255,209,102,0.16)'); radGrad.addColorStop(1, 'rgba(255,209,102,0)');
+    ctx.fillStyle = radGrad; ctx.fillRect(0, 0, 512, 512);
     this.textures.addCanvas('screen_flash', canvas);
   }
 
+  generateCompletionFrameTexture() {
+    // A solid purple rounded plate, slightly padded within its own canvas so a
+    // soft shadow can bleed outward. Rendered behind (and larger than) a piece,
+    // it reads as a steady outline/halo "shadow" around a completed tile -
+    // no pulsing, just a fixed, solid presence.
+    const size = 100;
+    const canvas = document.createElement('canvas');
+    canvas.width = size; canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    ctx.shadowColor = 'rgba(147,51,234,0.95)';
+    ctx.shadowBlur = 22;
+    ctx.shadowOffsetY = 5;
+    const grad = ctx.createLinearGradient(0, size, size, 0);
+    grad.addColorStop(0, '#5b21b6');
+    grad.addColorStop(0.5, '#9333ea');
+    grad.addColorStop(1, '#c084fc');
+    ctx.fillStyle = grad;
+    this.roundRect(ctx, 9, 9, size - 18, size - 18, 20);
+    ctx.fill();
+    this.textures.addCanvas('row_complete_frame', canvas);
+  }
+
   roundRect(ctx, x, y, w, h, r) {
-    ctx.beginPath();
-    ctx.moveTo(x + r, y);
-    ctx.lineTo(x + w - r, y);
-    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
-    ctx.lineTo(x + w, y + h - r);
-    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-    ctx.lineTo(x + r, y + h);
-    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
-    ctx.lineTo(x, y + r);
-    ctx.quadraticCurveTo(x, y, x + r, y);
-    ctx.closePath();
+    ctx.beginPath(); ctx.moveTo(x + r, y); ctx.lineTo(x + w - r, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r); ctx.lineTo(x + w, y + h - r);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h); ctx.lineTo(x + r, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - r); ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y); ctx.closePath();
   }
 
   create() {
     gameScene = this;
-    this.tileSize = 0; 
-    this.gap = 5;
-    this.pieces = {}; 
-    this.selected = null;
+    this.tileSize = 0; this.gap = 5;
+    this.pieces = {}; this.selected = null;
     this.fxGroup = this.add.group();
+    this.rowLabels = []; // Store row label references
     
     this.particles = this.add.particles(0, 0, 'flare', {
-      speed: { min: 80, max: 200 },
-      angle: { min: 200, max: 340 },
-      scale: { start: 0.6, end: 0 },
-      blendMode: 'ADD',
-      lifespan: 600,
-      tint: [0xffd166, 0xff7a3d, 0xff3d3d, 0xfff2b8],
-      gravityY: 150,
-      emitting: false
+      speed: { min: 80, max: 200 }, angle: { min: 200, max: 340 },
+      scale: { start: 0.6, end: 0 }, blendMode: 'ADD', lifespan: 600,
+      tint: [0xffd166, 0xff7a3d, 0xff3d3d, 0xfff2b8], gravityY: 150, emitting: false
     });
     
     this.boardGroup = this.add.group();
+    this.tutorialRings = [];
+    this.tutorialDimActive = false;
     this.drawBoard();
     this.input.on('pointerdown', this.handleInput, this);
-    
-    // FIX: Scale board once on create. No need to listen to window resize 
-    // because internal resolution is fixed and FIT mode handles the rest.
     this.scaleBoard();
+    
+    startTimer();
+    updateTutorialUI();
+    this.refreshTutorialVisuals();
+  }
+
+  // Darkens every piece/label except the ones in brightKeys (a Set of "r,c"
+  // strings), spotlighting the relevant tile(s) against a dimmed board.
+  applyTutorialDim(brightKeys) {
+    Object.keys(this.pieces).forEach(key => {
+      const cont = this.pieces[key];
+      if (!cont) return;
+      this.tweens.add({ targets: cont, alpha: brightKeys.has(key) ? 1 : 0.15, duration: 280, ease: 'Sine.easeOut' });
+    });
+    this.rowLabels.forEach(label => {
+      this.tweens.add({ targets: label, alpha: 0.15, duration: 280, ease: 'Sine.easeOut' });
+    });
+    this.tutorialDimActive = true;
+  }
+
+  clearTutorialDim() {
+    if (!this.tutorialDimActive) return;
+    Object.keys(this.pieces).forEach(key => {
+      const cont = this.pieces[key];
+      if (cont) this.tweens.add({ targets: cont, alpha: 1, duration: 250, ease: 'Sine.easeOut' });
+    });
+    this.rowLabels.forEach(label => {
+      this.tweens.add({ targets: label, alpha: 1, duration: 250, ease: 'Sine.easeOut' });
+    });
+    this.tutorialDimActive = false;
+  }
+
+  // A solid (non-pulsing) blue ring on each cell in `cells` ([{r,c}, ...]).
+  setTutorialRing(cells) {
+    this.clearTutorialRings();
+    cells.forEach(({ r, c }) => {
+      const cell = this.pieces[`${r},${c}`];
+      if (!cell) return;
+      const ring = this.add.sprite(cell.x, cell.y, 'glow_select')
+        .setDepth(150).setScale((this.tileSize / 100) * 1.12).setTint(0x6fa8ff).setAlpha(0);
+      this.tweens.add({ targets: ring, alpha: 1, duration: 280, ease: 'Sine.easeOut' });
+      this.tutorialRings.push(ring);
+    });
+  }
+
+  clearTutorialRings() {
+    (this.tutorialRings || []).forEach(r => r.destroy());
+    this.tutorialRings = [];
+  }
+
+  refreshTutorialVisuals() {
+    this.clearTutorialRings();
+    if (!isTutorialLevel() || tutorialStep === 0) { this.clearTutorialDim(); return; }
+    if (tutorialStep === 'intro') { this.applyTutorialDim(new Set()); return; }
+
+    if ((tutorialStep === 1 || tutorialStep === 2) && tutorialTarget1) {
+      const bright = new Set([`${tutorialTarget1.r},${tutorialTarget1.c}`]);
+      getKnightMoves(tutorialTarget1.r, tutorialTarget1.c).forEach(([mr, mc]) => bright.add(`${mr},${mc}`));
+      this.applyTutorialDim(bright);
+      this.setTutorialRing([tutorialTarget1]);
+    } else {
+      // Steps 3 & 4 are informational wrap-up - no need to keep the board dimmed.
+      this.clearTutorialDim();
+    }
   }
 
   drawBoard() {
     this.boardGroup.clear(true, true);
+    this.rowLabels = [];
+    
     for(let r=0; r<ROWS; r++) {
       for(let c=0; c<COLS; c++) {
+        if(voidCells.has(wallKey(r,c))) continue; // cell isn't part of the board shape at all
+
         let texKey = isWall(r,c) ? 'piece_wall' : (grid[r][c] === 6 ? 'piece_6' : 'piece_7');
         let sprite = this.add.sprite(0, 0, texKey);
-        
         let container = this.add.container(0, 0, [sprite]);
-        container.setData('r', r); 
-        container.setData('c', c); 
-        container.setData('val', grid[r][c]);
+        container.setData('r', r); container.setData('c', c); container.setData('val', grid[r][c]);
         
         if(!isWall(r,c)) {
           let pieceVal = grid[r][c];
           let txtColor = pieceVal === 6 ? '#eafcff' : '#fff0f9';
-          
-          let txt = this.add.text(0, 0, pieceVal.toString(), {
-            fontSize: '48px',
-            fontFamily: 'Arial',
-            color: txtColor,
-            fontStyle: 'bold'
+          let txt = this.add.text(0, 6, pieceVal.toString(), {
+            fontSize: '48px', fontFamily: 'Arial', color: txtColor, fontStyle: 'bold'
           }).setOrigin(0.5);
-          
           txt.setShadow(0, 2, 'rgba(0,0,0,0.5)', 4, true, true);
           container.add(txt);
         }
         
         container.setSize(100, 100);
         container.setInteractive(new Phaser.Geom.Rectangle(-50, -50, 100, 100), Phaser.Geom.Rectangle.Contains);
-        
         this.boardGroup.add(container);
         this.pieces[`${r},${c}`] = container;
       }
+      
+      // Create Row Label
+      let val = goalValue(r);
+      let label = this.add.text(0, 0, `${val} →`, {
+        fontSize: '32px', fontFamily: 'Arial', color: '#828aae', fontStyle: 'bold'
+      }).setOrigin(1, 0.5);
+      label.setData('row', r);
+      label.setData('val', val);
+      this.boardGroup.add(label);
+      this.rowLabels.push(label);
     }
   }
 
-  // FIX: Calculate positions based on INTERNAL game width, not DOM container width
   scaleBoard() {
     const internalWidth = this.sys.game.config.width;
-    const w = internalWidth - 28; // Account for padding
+    const w = internalWidth - 28;
     if (w <= 0) return;
     
     this.gap = 5;
@@ -425,32 +763,62 @@ class MainScene extends Phaser.Scene {
     const offsetX = (internalWidth - boardW) / 2 + this.tileSize/2;
     const offsetY = 14 + this.tileSize/2;
 
+    // Position pieces
     this.boardGroup.children.iterate((cont) => {
-      let r = cont.getData('r'), c = cont.getData('c');
-      let x = offsetX + c * (this.tileSize + this.gap);
+      if (cont.list && cont.list[0] && cont.list[0].texture) { // It's a piece container
+        let r = cont.getData('r'), c = cont.getData('c');
+        if (r === undefined) return;
+        let x = offsetX + c * (this.tileSize + this.gap);
+        let y = offsetY + r * (this.tileSize + this.gap);
+        
+        cont.setPosition(x, y);
+        cont.setData('baseX', x);
+        cont.setData('baseY', y);
+        cont.setScale(this.tileSize / 100);
+      }
+    });
+
+    // Position row labels - anchored to each row's own leftmost existing column,
+    // so labels still sit next to the board on shapes that aren't full rectangles.
+    this.rowLabels.forEach((label, r) => {
+      let minC = null;
+      for(let c=0; c<COLS; c++) { if(!voidCells.has(wallKey(r,c))) { minC = c; break; } }
+      if(minC === null) { label.setVisible(false); return; }
+      label.setVisible(true);
+      let x = offsetX + minC * (this.tileSize + this.gap) - this.tileSize/2 - 25;
       let y = offsetY + r * (this.tileSize + this.gap);
-      
-      cont.setPosition(x, y);
-      cont.setScale(this.tileSize / 100);
+      label.setPosition(x, y);
+      label.setScale(this.tileSize / 100);
     });
   }
 
+  getRowSpanCells(r) {
+    let firstC = null, lastC = null;
+    for(let c=0; c<COLS; c++) {
+      if(!voidCells.has(wallKey(r,c))) { if(firstC === null) firstC = c; lastC = c; }
+    }
+    if(firstC === null) return null;
+    return { first: this.pieces[`${r},${firstC}`], last: this.pieces[`${r},${lastC}`] };
+  }
+
   handleInput(pointer) {
+    if (gameOver) return;
+
     let clicked = null;
     this.boardGroup.children.iterate((cont) => {
-      let bounds = cont.getBounds();
-      if(bounds.contains(pointer.x, pointer.y)) clicked = cont;
+      if(cont.list && cont.list[0] && cont.list[0].texture) {
+        if(cont.getBounds().contains(pointer.x, pointer.y)) clicked = cont;
+      }
     });
 
     if(!clicked) { this.deselect(); return; }
     let r = clicked.getData('r'), c = clicked.getData('c');
     if(isWall(r,c) || locked[r][c]) return;
 
-    if(!this.selected) {
-      this.select(clicked);
-    } else {
+    if(!this.selected) this.select(clicked);
+    else {
       let sr = this.selected.getData('r'), sc = this.selected.getData('c');
-      if(sr === r && sc === c) { this.deselect(); }
+      if(sr === r && sc === c) this.deselect();
       else {
         let isValid = getKnightMoves(sr, sc).some(([mr, mc]) => mr === r && mc === c);
         if(isValid) this.swapPieces(this.selected, clicked);
@@ -465,51 +833,34 @@ class MainScene extends Phaser.Scene {
     
     this.tweens.add({ 
       targets: piece, 
-      y: piece.y - (this.tileSize * 0.08), 
-      duration: 150, 
-      ease: 'Back.easeOut' 
+      y: piece.getData('baseY') - (this.tileSize * 0.08), 
+      duration: 150, ease: 'Back.easeOut' 
     });
     
-    let glow = this.add.sprite(piece.x, piece.y, 'glow_select')
-      .setScale(this.tileSize / 100)
-      .setDepth(5);
+    let glow = this.add.sprite(piece.x, piece.y, 'glow_select').setScale(this.tileSize / 100).setDepth(5);
     piece.setData('glow', glow);
-    
-    this.tweens.add({ 
-      targets: glow, 
-      alpha: { from: 1, to: 0.6 }, 
-      scale: this.tileSize / 95,
-      duration: 700, 
-      yoyo: true, 
-      repeat: -1 
-    });
+    this.tweens.add({ targets: glow, alpha: { from: 1, to: 0.6 }, scale: this.tileSize / 95, duration: 700, yoyo: true, repeat: -1 });
 
     let r = piece.getData('r'), c = piece.getData('c');
     getKnightMoves(r, c).forEach(([mr, mc]) => {
       let target = this.pieces[`${mr},${mc}`];
       if(target && !isWall(mr,mc) && !locked[mr][mc]) {
-        let reach = this.add.sprite(target.x, target.y, 'glow_reach')
-          .setScale(this.tileSize / 100)
-          .setAlpha(0.7)
-          .setDepth(4);
+        let reach = this.add.sprite(target.x, target.y, 'glow_reach').setScale(this.tileSize / 100).setAlpha(0.7).setDepth(4);
         target.setData('reach', reach);
-        this.tweens.add({ 
-          targets: reach, 
-          alpha: { from: 0.7, to: 0.3 },
-          scale: this.tileSize / 95,
-          duration: 650, 
-          yoyo: true, 
-          repeat: -1 
-        });
+        this.tweens.add({ targets: reach, alpha: { from: 0.7, to: 0.3 }, scale: this.tileSize / 95, duration: 650, yoyo: true, repeat: -1 });
       }
     });
+
+    if (isTutorialLevel() && tutorialStep === 1 && tutorialTarget1 && r === tutorialTarget1.r && c === tutorialTarget1.c) {
+      advanceTutorial();
+    }
   }
 
   deselect() {
     if(this.selected) {
       this.tweens.add({ 
         targets: this.selected, 
-        y: this.selected.y + (this.tileSize * 0.08), 
+        y: this.selected.getData('baseY'), 
         duration: 150 
       });
       if(this.selected.getData('glow')) {
@@ -518,214 +869,190 @@ class MainScene extends Phaser.Scene {
       }
     }
     this.selected = null;
-    
     this.boardGroup.children.iterate(c => {
-      if(c.getData('reach')) {
-        c.getData('reach').destroy();
-        c.setData('reach', null);
-      }
+      if(c.getData('reach')) { c.getData('reach').destroy(); c.setData('reach', null); }
     });
   }
 
   swapPieces(p1, p2) {
     let r1 = p1.getData('r'), c1 = p1.getData('c');
     let r2 = p2.getData('r'), c2 = p2.getData('c');
+    
+    let p1BaseX = p1.getData('baseX'), p1BaseY = p1.getData('baseY');
+    let p2BaseX = p2.getData('baseX'), p2BaseY = p2.getData('baseY');
+
     this.deselect();
 
-    this.tweens.add({ 
-      targets: p1, 
-      x: p2.x, 
-      y: p2.y, 
-      duration: 350, 
-      ease: 'Cubic.easeInOut' 
-    });
+    this.tweens.add({ targets: p1, x: p2BaseX, y: p2BaseY, duration: 350, ease: 'Cubic.easeInOut' });
     this.tweens.add({
-      targets: p2, 
-      x: p1.x, 
-      y: p1.y, 
-      duration: 350, 
-      ease: 'Cubic.easeInOut',
+      targets: p2, x: p1BaseX, y: p1BaseY, duration: 350, ease: 'Cubic.easeInOut',
       onComplete: () => {
         [grid[r1][c1], grid[r2][c2]] = [grid[r2][c2], grid[r1][c1]];
         
-        p1.setData('r', r2); 
-        p1.setData('c', c2); 
-        p1.setData('val', grid[r2][c2]);
-        p2.setData('r', r1); 
-        p2.setData('c', c1); 
-        p2.setData('val', grid[r1][c1]);
+        p1.setData('r', r2); p1.setData('c', c2); p1.setData('val', grid[r2][c2]);
+        p2.setData('r', r1); p2.setData('c', c1); p2.setData('val', grid[r1][c1]);
         
+        p1.setData('baseX', p2BaseX); p1.setData('baseY', p2BaseY);
+        p2.setData('baseX', p1BaseX); p2.setData('baseY', p1BaseY);
+
         this.pieces[`${r2},${c2}`] = p1; 
         this.pieces[`${r1},${c1}`] = p2;
 
         moves++; 
         document.getElementById('mc').innerText = moves;
-        
         this.checkNewlyCompletedRows();
+
+        if (isTutorialLevel() && tutorialStep === 2 && tutorialTarget1) {
+          const t1 = tutorialTarget1;
+          const involvesTarget1 = (r1===t1.r && c1===t1.c) || (r2===t1.r && c2===t1.c);
+          if (involvesTarget1) advanceTutorial();
+        }
       }
     });
   }
 
-  checkNewlyCompletedRows() {
-    let newlyCompleted = [];
-    
-    for(let r=0; r<ROWS; r++) {
-      let isComplete = true;
-      for(let c=0; c<COLS; c++) {
-        if(!isWall(r,c) && !isCorrect(r, c, grid[r][c])) {
-          isComplete = false;
-          break;
-        }
-      }
-      
-      if(isComplete && !rowsCompletedBefore.has(r)) {
-        newlyCompleted.push(r);
-        rowsCompletedBefore.add(r);
-      } else if(!isComplete && rowsCompletedBefore.has(r)) {
-        rowsCompletedBefore.delete(r);
-      }
-    }
-    
-    newlyCompleted.forEach(r => this.triggerRowFireFX(r));
-    
-    let lockCount = 0;
-    for(let r=0; r<ROWS; r++) {
-      for(let c=0; c<COLS; c++) {
-        if(locked[r][c]) lockCount++;
-      }
-    }
-    document.getElementById('lc').innerText = lockCount;
-    
-    if(newlyCompleted.length > 0) {
-      setTimeout(() => this.checkWin(), 1000);
+  applyCompletionGlow(r) {
+    // Runs slightly after the lock-in FX so it doesn't fight the pop animation.
+    if (!rowsCompletedBefore.has(r)) return; // row broke again before this fired
+    const baseScale = this.tileSize / 100;
+    for(let c=0; c<COLS; c++) {
+      if(isWall(r,c)) continue;
+      const cell = this.pieces[`${r},${c}`];
+      if(!cell || cell.getData('completeGlow')) continue;
+
+      // A solid purple plate, larger than the piece and set behind it, so its
+      // edges show as a steady outline/shadow around the tile - fades in once
+      // and then just sits there. No pulsing, no oscillation.
+      const frame = this.add.sprite(cell.x, cell.y, 'row_complete_frame')
+        .setScale(baseScale * 1.3).setDepth(-0.5).setAlpha(0);
+      cell.setData('completeGlow', frame);
+      this.tweens.add({ targets: frame, alpha: 1, duration: 320, ease: 'Sine.easeOut' });
     }
   }
 
-  triggerRowFireFX(rowIndex) {
-    const firstCell = this.pieces[`${rowIndex},0`];
-    const lastCell = this.pieces[`${rowIndex},${COLS-1}`];
-    if(!firstCell || !lastCell) return;
+  clearCompletionGlow(r) {
+    for(let c=0; c<COLS; c++) {
+      if(isWall(r,c)) continue;
+      const cell = this.pieces[`${r},${c}`];
+      if(!cell) continue;
+
+      const frame = cell.getData('completeGlow');
+      if(frame) {
+        this.tweens.add({ targets: frame, alpha: 0, duration: 200, ease: 'Sine.easeIn', onComplete: () => frame.destroy() });
+        cell.setData('completeGlow', null);
+      }
+    }
+  }
+
+  checkNewlyCompletedRows() {
+    let newlyCompleted = [];
+    let newlyBroken = [];
+    for(let r=0; r<ROWS; r++) {
+      if(!rowHasCells(r)) continue;
+      let isComplete = true;
+      for(let c=0; c<COLS; c++) if(!isWall(r,c) && !isCorrect(r, c, grid[r][c])) { isComplete = false; break; }
+      
+      if(isComplete && !rowsCompletedBefore.has(r)) { newlyCompleted.push(r); rowsCompletedBefore.add(r); }
+      else if(!isComplete && rowsCompletedBefore.has(r)) { rowsCompletedBefore.delete(r); newlyBroken.push(r); }
+    }
     
+    newlyCompleted.forEach(r => {
+      this.triggerRowFireFX(r);
+      this.time.delayedCall(650, () => this.applyCompletionGlow(r));
+      let label = this.rowLabels[r];
+      let val = label.getData('val');
+      let color = val === 6 ? '#4fe3ff' : '#ff62c4';
+      label.setText(`${val} ✓`);
+      label.setColor(color);
+      label.setShadow(0, 0, color, 12);
+    });
+
+    newlyBroken.forEach(r => {
+      this.clearCompletionGlow(r);
+      let label = this.rowLabels[r];
+      let val = label.getData('val');
+      label.setText(`${val} →`);
+      label.setColor('#828aae');
+      label.setShadow(0, 0, 'transparent', 0);
+    });
+    
+    let lockCount = 0;
+    for(let r=0; r<ROWS; r++) for(let c=0; c<COLS; c++) if(locked[r][c]) lockCount++;
+    document.getElementById('lc').innerText = lockCount;
+    
+    if(newlyCompleted.length > 0) setTimeout(() => this.checkWin(), 1000);
+  }
+
+  triggerRowFireFX(rowIndex) {
+    const span = this.getRowSpanCells(rowIndex);
+    if(!span || !span.first || !span.last) return;
+    const firstCell = span.first, lastCell = span.last;
+
+    const val = goalValue(rowIndex);
+    const tintColor = val === 6 ? 0x4fe3ff : 0xff62c4;
     const midX = (firstCell.x + lastCell.x) / 2;
     const rowY = firstCell.y;
     
     this.cameras.main.shake(400, 0.015);
     
-    let flash = this.add.sprite(this.scale.width/2, this.scale.height/2, 'screen_flash')
-      .setAlpha(0)
-      .setDepth(100);
+    let flash = this.add.sprite(this.scale.width/2, this.scale.height/2, 'screen_flash').setAlpha(0).setDepth(100).setTint(tintColor);
     flash.setDisplaySize(this.scale.width * 2, this.scale.height * 2);
-    this.tweens.add({ 
-      targets: flash, 
-      alpha: { from: 0, to: 1, back: 0 }, 
-      duration: 100, 
-      yoyo: true, 
-      hold: 100,
-      onComplete: () => flash.destroy()
-    });
+    this.tweens.add({ targets: flash, alpha: { from: 0, to: 1, back: 0 }, duration: 100, yoyo: true, hold: 100, onComplete: () => flash.destroy() });
     
-    let sweep = this.add.sprite(firstCell.x - 100, rowY, 'row_sweep')
-      .setDepth(50)
-      .setAlpha(0.8);
+    let sweep = this.add.sprite(firstCell.x - 100, rowY, 'row_sweep').setDepth(50).setAlpha(0.85).setTint(tintColor);
     sweep.setDisplaySize(200, this.tileSize);
-    this.tweens.add({ 
-      targets: sweep, 
-      x: lastCell.x + 200, 
-      duration: 650, 
-      ease: 'Linear',
-      onComplete: () => sweep.destroy()
-    });
+    this.tweens.add({ targets: sweep, x: lastCell.x + 200, duration: 600, ease: 'Linear', onComplete: () => sweep.destroy() });
     
     const cells = [];
-    for(let c=0; c<COLS; c++) {
-      if(!isWall(rowIndex, c)) {
-        cells.push(this.pieces[`${rowIndex},${c}`]);
-      }
-    }
+    for(let c=0; c<COLS; c++) if(!isWall(rowIndex, c)) cells.push(this.pieces[`${rowIndex},${c}`]);
     
     cells.forEach((cell, i) => {
-      this.time.delayedCall(i * 36, () => {
-        this.tweens.add({
-          targets: cell,
-          scaleX: cell.scaleX * 1.25,
-          scaleY: cell.scaleY * 1.25,
-          duration: 200,
-          ease: 'Back.easeOut',
-          yoyo: true
-        });
-        
-        let ring = this.add.sprite(cell.x, cell.y, 'shock_ring')
-          .setScale(0.2)
-          .setAlpha(1)
-          .setDepth(60);
-        this.tweens.add({ 
-          targets: ring, 
-          scale: 2.5, 
-          alpha: 0, 
-          duration: 550, 
-          ease: 'Cubic.easeOut', 
-          onComplete: () => ring.destroy() 
-        });
-        
-        this.particles.emitParticleAt(cell.x, cell.y + 10, 12);
+      this.time.delayedCall(i * 32, () => {
+        this.tweens.add({ targets: cell, scaleX: cell.scaleX * 1.28, scaleY: cell.scaleY * 1.28, duration: 190, ease: 'Back.easeOut', yoyo: true });
+        let ring = this.add.sprite(cell.x, cell.y, 'shock_ring').setScale(0.2).setAlpha(1).setDepth(60).setTint(tintColor);
+        this.tweens.add({ targets: ring, scale: 2.3, alpha: 0, duration: 500, ease: 'Cubic.easeOut', onComplete: () => ring.destroy() });
+        this.particles.emitParticleAt(cell.x, cell.y + 10, 10);
       });
     });
     
     const bannerBg = this.add.graphics().setDepth(110);
-    bannerBg.fillStyle(0xff7a3d, 1);
-    bannerBg.fillRoundedRect(-90, -22, 180, 44, 22);
-    const bannerTxt = this.add.text(0, 0, '🔥 Row Locked!', { 
-      fontSize: '20px', 
-      color: '#2a1300', 
-      fontStyle: 'bold' 
-    }).setOrigin(0.5).setDepth(111);
-    const banner = this.add.container(midX, rowY - 50, [bannerBg, bannerTxt])
-      .setDepth(110)
-      .setScale(0);
-    
-    this.tweens.add({
-      targets: banner, 
-      scale: 1.15, 
-      duration: 220, 
-      ease: 'Back.easeOut',
-      yoyo: true, 
-      hold: 900,
-      onComplete: () => banner.destroy()
-    });
+    bannerBg.fillStyle(tintColor, 1); bannerBg.fillRoundedRect(-95, -22, 190, 44, 22);
+    const bannerTxt = this.add.text(0, 0, val === 6 ? '⚡ Row Locked!' : '🔥 Row Locked!', { fontSize: '19px', color: '#0b0e18', fontStyle: 'bold' }).setOrigin(0.5).setDepth(111);
+    const banner = this.add.container(midX, rowY - 50, [bannerBg, bannerTxt]).setDepth(110).setScale(0);
+    this.tweens.add({ targets: banner, scale: 1.18, duration: 200, ease: 'Back.easeOut', yoyo: true, hold: 850, onComplete: () => banner.destroy() });
   }
 
   checkWin() {
     let allCorrect = true;
-    for(let r=0; r<ROWS; r++) {
-      for(let c=0; c<COLS; c++) {
-        if(!isWall(r,c) && !isCorrect(r, c, grid[r][c])) {
-          allCorrect = false;
-          break;
-        }
-      }
-    }
+    for(let r=0; r<ROWS; r++) for(let c=0; c<COLS; c++) if(!isWall(r,c) && !isCorrect(r, c, grid[r][c])) { allCorrect = false; break; }
     
     if(allCorrect) {
+      stopTimer();
+      
+      // Handle Best Time
+      const levelKey = `level_${currentLevelIndex}`;
+      const currentBest = bestTimes[levelKey];
+      let isNewBest = false;
+      
+      if (!currentBest || elapsedTime < currentBest) {
+        bestTimes[levelKey] = elapsedTime;
+        localStorage.setItem('knightSwapBestTimes', JSON.stringify(bestTimes));
+        isNewBest = true;
+      }
+      
       document.getElementById('win-mc').innerText = moves;
+      document.getElementById('win-time').innerText = formatTime(elapsedTime);
+      document.getElementById('win-best').innerText = isNewBest ? `${formatTime(elapsedTime)} (New Best!)` : formatTime(currentBest);
+      document.getElementById('win-again-btn').style.display = LEVELS[currentLevelIndex].endless ? 'inline-block' : 'none';
       document.getElementById('win-overlay').classList.add('show');
     }
   }
 }
 
-// ═══════════════════════════════════════════
-//  INITIALIZATION
-// ═══════════════════════════════════════════
 const config = {
-  type: Phaser.AUTO,
-  parent: 'phaser-container',
-  width: 800, 
-  height: 1400, // FIX: Increased height to ensure all 14 rows fit comfortably
-  backgroundColor: '#0d1120',
-  scene: MainScene,
-  scale: { 
-    mode: Phaser.Scale.FIT, 
-    autoCenter: Phaser.Scale.CENTER_BOTH // FIX: Center both horizontally and vertically
-  },
+  type: Phaser.AUTO, parent: 'phaser-container', width: 800, height: 1400,
+  backgroundColor: '#0d1120', scene: MainScene,
+  scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
   fps: { target: 60 }
 };
 
@@ -735,10 +1062,13 @@ function renderLevelSelect() {
   LEVELS.forEach((lvl, i) => {
     let btn = document.createElement('button');
     btn.className = 'level-card';
+    const best = bestTimes[`level_${i}`];
     btn.innerHTML = `
       <div class="level-card-icon">${lvl.icon}</div>
       <div class="level-card-label">${lvl.label}</div>
       <div class="level-card-sub">${lvl.subtitle}</div>
+      ${lvl.timeLimit ? `<div class="level-card-time">⏱ ${lvl.timeLimit}s</div>` : ''}
+      ${best !== undefined ? `<div class="level-card-best">Best: ${formatTime(best)}</div>` : ''}
     `;
     btn.onclick = () => startGame(i);
     gridEl.appendChild(btn);
@@ -747,7 +1077,14 @@ function renderLevelSelect() {
 
 function startGame(idx) {
   currentLevelIndex = idx;
-  generateLevel(LEVELS[idx].walls);
+  gameOver = false;
+  tutorialStep = LEVELS[idx].tutorial ? 'intro' : 0;
+  document.getElementById('win-overlay').classList.remove('show');
+  document.getElementById('lose-overlay').classList.remove('show');
+  updateTutorialUI();
+
+  generateLevel(LEVELS[idx]);
+  tutorialTarget1 = LEVELS[idx].tutorial ? computeTutorialTarget1() : null;
   moves = 0;
   document.getElementById('mc').innerText = '0';
   document.getElementById('lc').innerText = '0';
@@ -757,11 +1094,8 @@ function startGame(idx) {
   document.getElementById('panel-game').classList.add('active');
   
   setTimeout(() => {
-    if (!game) {
-      game = new Phaser.Game(config);
-    } else {
-      gameScene.scene.restart();
-    }
+    if (!game) game = new Phaser.Game(config);
+    else gameScene.scene.restart();
   }, 50);
 }
 
@@ -769,12 +1103,33 @@ function closeWin() {
   document.getElementById('win-overlay').classList.remove('show');
   document.getElementById('panel-game').classList.remove('active');
   document.getElementById('panel-levels').classList.add('active');
+  tutorialStep = 0;
+  updateTutorialUI();
+  renderLevelSelect(); // Refresh to show updated best times
 }
 
 document.getElementById('reset-btn').onclick = () => startGame(currentLevelIndex);
 document.getElementById('levels-back-btn').onclick = () => {
+  stopTimer();
   document.getElementById('panel-game').classList.remove('active');
   document.getElementById('panel-levels').classList.add('active');
+  tutorialStep = 0;
+  updateTutorialUI();
+};
+document.getElementById('tutorial-action-btn').onclick = tutorialPrimaryClick;
+document.getElementById('tutorial-skip-link').onclick = endTutorial;
+document.getElementById('win-again-btn').onclick = () => {
+  document.getElementById('win-overlay').classList.remove('show');
+  startGame(currentLevelIndex);
+};
+document.getElementById('lose-retry-btn').onclick = () => startGame(currentLevelIndex);
+document.getElementById('lose-back-btn').onclick = () => {
+  document.getElementById('lose-overlay').classList.remove('show');
+  document.getElementById('panel-game').classList.remove('active');
+  document.getElementById('panel-levels').classList.add('active');
+  tutorialStep = 0;
+  updateTutorialUI();
+  renderLevelSelect();
 };
 
 renderLevelSelect();
